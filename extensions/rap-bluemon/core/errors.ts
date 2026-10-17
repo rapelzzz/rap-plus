@@ -1,5 +1,5 @@
 /** Unified log prefix for all extension error messages. */
-export const EXT_PREFIX = "[rap-night]";
+export const EXT_PREFIX = "[rap-plus]";
 
 export type ExtensionErrorSink = (err: unknown, context: string) => void;
 

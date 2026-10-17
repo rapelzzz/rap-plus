@@ -1319,8 +1319,8 @@ export function registerTokyoNightExtension(
     }
   });
 
-  pi.registerCommand("rap-night", {
-    description: "Open Neon Studio (Tokyo Night Blue). Usage: /rap-night [on|off]",
+  pi.registerCommand("rap-plus", {
+    description: "Open Neon Studio (Tokyo Night Blue). Usage: /rap-plus [on|off]",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const arg = args.trim().toLowerCase();
       if (arg === "on" || arg === "off") {
