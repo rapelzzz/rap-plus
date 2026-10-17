@@ -10,6 +10,7 @@
  *   /todo remove <id>           Remove (warns + confirms when dependents exist).
  *   /todo resume                Resume unfinished work (marks next task in progress).
  *   /todo clear-completed       Delete completed records (with confirmation).
+ *   /todo clear                 Delete ALL todos, completed + unfinished (with confirmation).
  */
 
 import type {
@@ -148,7 +149,7 @@ function notifyResult(ctx: ExtensionCommandContext, ok: boolean, message: string
 export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDeps): void {
   pi.registerCommand("todo", {
     description:
-      "Rap Todo system. Subcommands: list, add <task>, check <id>, uncheck <id>, edit <id> <title>, remove <id>, resume, clear-completed.",
+      "Rap Todo system. Subcommands: list, add <task>, check <id>, uncheck <id>, edit <id> <title>, remove <id>, resume, clear-completed, clear.",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const trimmed = args.trim();
       const spaceIdx = trimmed.indexOf(" ");
@@ -329,8 +330,29 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
           return;
         }
 
+        case "clear": {
+          if (ctx.hasUI) {
+            const ok = await ctx.ui.confirm(
+              "Clear ALL todos?",
+              "This permanently removes every todo (completed + unfinished) for this project.",
+            );
+            if (!ok) {
+              notifyResult(ctx, true, "Cancelled.");
+              return;
+            }
+          }
+          const res = session.manager.clearAll();
+          if (!res.ok) {
+            notifyResult(ctx, false, res.error);
+            return;
+          }
+          if (ctx.mode === "tui" && ctx.hasUI) deps.refreshPanel(ctx.ui, ctx.cwd);
+          notifyResult(ctx, true, `Cleared all ${(res as { removed: number }).removed} todo(s).`);
+          return;
+        }
+
         default:
-          notifyResult(ctx, false, `Unknown subcommand "${sub}". Try: list, add, check, uncheck, edit, remove, resume, clear-completed.`);
+          notifyResult(ctx, false, `Unknown subcommand "${sub}". Try: list, add, check, uncheck, edit, remove, resume, clear-completed, clear.`);
       }
     },
   });

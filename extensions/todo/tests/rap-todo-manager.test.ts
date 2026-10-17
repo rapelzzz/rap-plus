@@ -90,6 +90,19 @@ test("planTasks is a no-op when re-planning the identical unfinished automatic p
 	assert.equal(beforeIds, afterIds);
 });
 
+test("clearAll removes every todo and clears the active task", () => {
+	const m = freshManager();
+	m.planTasks([{ title: "A" }, { title: "B" }]);
+	m.add("manual", "manual");
+	m.setStatus(m.getTodos().find((t) => t.title === "A")!.id, "in_progress");
+	assert.equal(m.getTodos().length, 3);
+	const res = m.clearAll();
+	assert.equal(res.ok, true);
+	assert.equal((res as { removed: number }).removed, 3);
+	assert.equal(m.getTodos().length, 0);
+	assert.equal(m.hasUnfinished(), false);
+});
+
 test("planTasks rejects duplicate titles, unknown deps, and cycles", () => {
 	const m = freshManager();
 	const dups = m.planTasks([{ title: "X" }, { title: "X" }]);

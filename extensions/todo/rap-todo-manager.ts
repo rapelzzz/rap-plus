@@ -240,6 +240,15 @@ export class RapTodoManager {
     return { ...this.commit(), removed };
   }
 
+  /** Remove ALL todos (completed + unfinished). Resets the active task. nextId stays monotonic. */
+  clearAll(): RapTodoOpResult & { removed: number } {
+    const before = this.project.todos.length;
+    this.project.todos = [];
+    this.project.activeTask = undefined;
+    const removed = before;
+    return { ...this.commit(), removed };
+  }
+
   /** Set a task's status with transition validation. */
   setStatus(id: string, status: RapTodoStatus): RapTodoOpResult {
     const item = this.find(id);
