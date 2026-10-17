@@ -5,6 +5,11 @@
   "description": "RAP+ — Pi extensions & theme pack (bluemon studio, todo system, widget renderer, web search).",
   "type": "module",
   "keywords": ["pi-package"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'extensions/**/*.test.ts'",
+    "test:integration": "node --test 'extensions/**/tests/integration*.test.ts'"
+  },
   "homepage": "https://github.com/rapelzzz/rap-plus",
   "repository": {
     "type": "git",
@@ -14,7 +19,14 @@
     "extensions": [
       "./extensions/rap-web-search.ts",
       "./extensions/rap-bluemon/index.ts",
-      "./extensions/todo/index.ts"
+      "./extensions/todo/index.ts",
+      "./extensions/rap-plan-mode/index.ts",
+      "./extensions/rap-subagents/index.ts",
+      "./extensions/rap-simplify/index.ts",
+      "./extensions/rap-code-review/index.ts",
+      "./extensions/rap-lens/index.ts",
+      "./extensions/rap-debug-mode/index.ts",
+      "./extensions/rap-agent-ide/index.ts"
     ],
     "themes": [
       "./themes/*.json"

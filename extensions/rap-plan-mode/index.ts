@@ -1,0 +1,358 @@
+/**
+ * rap-plan-mode — read-only planning mode for Pi.
+ *
+ * Behavioral parity target: `pi-plan-mode` (qmx, npm) + Pi's own bundled
+ * example `examples/extensions/plan-mode`. Toggleable read-only mode that
+ * TECHNICALLY blocks write/edit tools (via setActiveTools) and destructive
+ * bash (via tool_call handler). Supports numbered plan extraction, [DONE:n]
+ * progress tracking, a progress widget, session persistence, a shortcut, and
+ * a `--plan` startup flag.
+ *
+ * Safety invariant: while active, the model cannot write source files — this
+ * is enforced at the tool layer, not merely by instruction.
+ */
+
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Key } from "@earendil-works/pi-tui";
+import { isSafeCommand } from "../_shared/bash-allowlist.ts";
+import { extractTodoItems, markCompletedSteps, type TodoItem } from "./utils.ts";
+
+// Read-only tools retained in plan mode; edit/write removed.
+const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "questionnaire"];
+const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
+const PLAN_MODE_DISABLED_TOOLS = new Set<string>(["edit", "write"]);
+const PLAN_MANAGED_TOOLS = new Set<string>([...PLAN_MODE_TOOLS, ...NORMAL_MODE_TOOLS]);
+
+interface PlanModeState {
+	enabled: boolean;
+	todos?: TodoItem[];
+	executing?: boolean;
+	toolsBeforePlanMode?: string[];
+}
+
+function isAssistantMessage(m: AgentMessage): m is AssistantMessage {
+	return m.role === "assistant" && Array.isArray(m.content);
+}
+
+function getTextContent(message: AssistantMessage): string {
+	return message.content
+		.filter((block): block is TextContent => block.type === "text")
+		.map((block) => block.text)
+		.join("\n");
+}
+
+export default function rapPlanMode(pi: ExtensionAPI): void {
+	let planModeEnabled = false;
+	let executionMode = false;
+	let todoItems: TodoItem[] = [];
+	let toolsBeforePlanMode: string[] | undefined;
+
+	pi.registerFlag("plan", {
+		description: "Start in rap-plan-mode (read-only exploration)",
+		type: "boolean",
+		default: false,
+	});
+
+	function updateStatus(ctx: ExtensionContext): void {
+		if (executionMode && todoItems.length > 0) {
+			const completed = todoItems.filter((t) => t.completed).length;
+			ctx.ui.setStatus("rap-plan-mode", ctx.ui.theme.fg("accent", `📋 ${completed}/${todoItems.length}`));
+		} else if (planModeEnabled) {
+			ctx.ui.setStatus("rap-plan-mode", ctx.ui.theme.fg("warning", "⏸ plan"));
+		} else {
+			ctx.ui.setStatus("rap-plan-mode", undefined);
+		}
+
+		if (executionMode && todoItems.length > 0) {
+			const lines = todoItems.map((item) =>
+				item.completed
+					? ctx.ui.theme.fg("success", "☑ ") + ctx.ui.theme.fg("muted", ctx.ui.theme.strikethrough(item.text))
+					: `${ctx.ui.theme.fg("muted", "☐ ")}${item.text}`,
+			);
+			ctx.ui.setWidget("rap-plan-todos", lines);
+		} else {
+			ctx.ui.setWidget("rap-plan-todos", undefined);
+		}
+	}
+
+	const uniqueToolNames = (names: string[]): string[] => [...new Set(names)];
+
+	function getPlanModeTools(activeToolNames: string[]): string[] {
+		return uniqueToolNames([
+			...activeToolNames.filter((name) => !PLAN_MODE_DISABLED_TOOLS.has(name)),
+			...PLAN_MODE_TOOLS,
+		]);
+	}
+
+	function getNormalModeTools(activeToolNames: string[]): string[] {
+		return uniqueToolNames([
+			...NORMAL_MODE_TOOLS,
+			...activeToolNames.filter((name) => !PLAN_MANAGED_TOOLS.has(name)),
+		]);
+	}
+
+	function enablePlanModeTools(): void {
+		if (toolsBeforePlanMode === undefined) {
+			toolsBeforePlanMode = pi.getActiveTools();
+		}
+		pi.setActiveTools(getPlanModeTools(toolsBeforePlanMode));
+	}
+
+	function restoreNormalModeTools(): void {
+		pi.setActiveTools(toolsBeforePlanMode ?? getNormalModeTools(pi.getActiveTools()));
+		toolsBeforePlanMode = undefined;
+	}
+
+	function persistState(): void {
+		pi.appendEntry("rap-plan-mode", {
+			enabled: planModeEnabled,
+			todos: todoItems,
+			executing: executionMode,
+			toolsBeforePlanMode,
+		});
+	}
+
+	function togglePlanMode(ctx: ExtensionContext): void {
+		planModeEnabled = !planModeEnabled;
+		executionMode = false;
+		todoItems = [];
+
+		if (planModeEnabled) {
+			enablePlanModeTools();
+			ctx.ui.notify("rap-plan-mode enabled. Write/edit tools disabled.");
+		} else {
+			restoreNormalModeTools();
+			ctx.ui.notify("rap-plan-mode disabled. Full access restored.");
+		}
+		updateStatus(ctx);
+		persistState();
+	}
+
+	pi.registerCommand("plan", {
+		description: "Toggle rap-plan-mode (read-only exploration)",
+		handler: async (_args, ctx) => togglePlanMode(ctx),
+	});
+
+	pi.registerCommand("todos", {
+		description: "Show current rap-plan-mode todo list",
+		handler: async (_args, ctx) => {
+			if (todoItems.length === 0) {
+				ctx.ui.notify("No todos. Create a plan first with /plan", "info");
+				return;
+			}
+			const list = todoItems.map((item, i) => `${i + 1}. ${item.completed ? "✓" : "○"} ${item.text}`).join("\n");
+			ctx.ui.notify(`Plan Progress:\n${list}`, "info");
+		},
+	});
+
+	pi.registerShortcut(Key.ctrlAlt("p"), {
+		description: "Toggle rap-plan-mode",
+		handler: async (ctx) => togglePlanMode(ctx),
+	});
+
+	// TECHNICAL SAFETY GATE: block destructive bash while planning.
+	pi.on("tool_call", async (event) => {
+		if (!planModeEnabled || event.toolName !== "bash") return;
+		const command = event.input.command as string;
+		if (!isSafeCommand(command)) {
+			return {
+				block: true,
+				reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\nCommand: ${command}`,
+			};
+		}
+	});
+
+	// Drop stale plan-mode context when not active.
+	pi.on("context", async (event) => {
+		if (planModeEnabled) return;
+		return {
+			messages: event.messages.filter((m) => {
+				const msg = m as AgentMessage & { customType?: string };
+				if (msg.customType === "rap-plan-mode-context") return false;
+				if (msg.role !== "user") return true;
+				const content = msg.content;
+				if (typeof content === "string") return !content.includes("[PLAN MODE ACTIVE]");
+				if (Array.isArray(content)) {
+					return !content.some(
+						(c) => c.type === "text" && (c as TextContent).text?.includes("[PLAN MODE ACTIVE]"),
+					);
+				}
+				return true;
+			}),
+		};
+	});
+
+	// Inject plan/execution context before a user prompt.
+	pi.on("before_agent_start", async (event) => {
+		if (event.messageType !== "user") return;
+
+		if (planModeEnabled) {
+			return {
+				message: {
+					customType: "rap-plan-mode-context",
+					content: `[PLAN MODE ACTIVE]
+You are in rap-plan-mode — a read-only exploration mode.
+
+Restrictions (enforced at the tool layer):
+- edit and write tools are disabled
+- bash is restricted to an allowlist of read-only commands
+
+Ask clarifying questions using the questionnaire tool.
+
+Create a detailed numbered plan under a "Plan:" header:
+
+Plan:
+1. First step description
+2. Second step description
+...
+
+Do NOT attempt to make changes — just describe what you would do.`,
+					display: false,
+				},
+			};
+		}
+
+		if (executionMode && todoItems.length > 0) {
+			const remaining = todoItems.filter((t) => !t.completed);
+			const todoList = remaining.map((t) => `${t.step}. ${t.text}`).join("\n");
+			return {
+				message: {
+					customType: "rap-plan-execution-context",
+					content: `[EXECUTING PLAN — full tool access enabled]
+
+Remaining steps:
+${todoList}
+
+Execute each step in order.
+After completing a step, include a [DONE:n] tag in your response.`,
+					display: false,
+				},
+			};
+		}
+	});
+
+	// Track progress after each turn.
+	pi.on("turn_end", async (event, ctx) => {
+		if (!executionMode || todoItems.length === 0) return;
+		if (!isAssistantMessage(event.message)) return;
+		const text = getTextContent(event.message);
+		if (markCompletedSteps(text, todoItems) > 0) {
+			updateStatus(ctx);
+		}
+		persistState();
+	});
+
+	// Plan completion + plan-mode UI flow.
+	pi.on("agent_end", async (event, ctx) => {
+		if (executionMode && todoItems.length > 0) {
+			if (todoItems.every((t) => t.completed)) {
+				const completedList = todoItems.map((t) => `~~${t.text}~~`).join("\n");
+				pi.sendMessage(
+					{ customType: "rap-plan-complete", content: `**Plan Complete!** ✓\n\n${completedList}`, display: true },
+					{ triggerTurn: false },
+				);
+				executionMode = false;
+				todoItems = [];
+				updateStatus(ctx);
+				persistState();
+			}
+			return;
+		}
+
+		if (!planModeEnabled || !ctx.hasUI) return;
+
+		const lastAssistant = [...event.messages].reverse().find(isAssistantMessage);
+		if (lastAssistant) {
+			const extracted = extractTodoItems(getTextContent(lastAssistant));
+			if (extracted.length > 0) todoItems = extracted;
+		}
+		if (todoItems.length === 0) return;
+		persistState();
+
+		const todoListText = todoItems.map((t, i) => `${i + 1}. ☐ ${t.text}`).join("\n");
+		const planTodoListMessage = {
+			customType: "rap-plan-todo-list",
+			content: `**Plan Steps (${todoItems.length}):**\n\n${todoListText}`,
+			display: true,
+		};
+
+		const choice = await ctx.ui.select("rap-plan-mode — what next?", [
+			"Execute the plan (track progress)",
+			"Stay in plan mode",
+			"Refine the plan",
+		]);
+
+		if (choice?.startsWith("Execute")) {
+			const firstTodoItem = todoItems[0];
+			if (!firstTodoItem) return;
+			planModeEnabled = false;
+			executionMode = true;
+			restoreNormalModeTools();
+			updateStatus(ctx);
+			persistState();
+
+			const remainingList = todoItems.map((t) => `${t.step}. ${t.text}`).join("\n");
+			const execMessage = `Execute the plan.
+
+Remaining steps:
+${remainingList}
+
+Start with: ${firstTodoItem.text}
+After completing a step, include a [DONE:n] tag in your response.`;
+			pi.sendMessage(planTodoListMessage, { deliverAs: "followUp" });
+			pi.sendMessage(
+				{ customType: "rap-plan-mode-execute", content: execMessage, display: true },
+				{ triggerTurn: true, deliverAs: "followUp" },
+			);
+		} else if (choice === "Refine the plan") {
+			const refinement = await ctx.ui.editor("Refine the plan:", "");
+			if (refinement?.trim()) {
+				pi.sendMessage(planTodoListMessage, { deliverAs: "followUp" });
+				pi.sendUserMessage(refinement.trim(), { deliverAs: "followUp" });
+			}
+		}
+	});
+
+	// Restore state on session start/resume.
+	pi.on("session_start", async (_event, ctx) => {
+		if (pi.getFlag("plan") === true) planModeEnabled = true;
+
+		const entries = ctx.sessionManager.getEntries();
+		const planModeEntry = entries
+			.filter((e: { type: string; customType?: string }) => e.type === "custom" && e.customType === "rap-plan-mode")
+			.pop() as { data?: PlanModeState } | undefined;
+
+		if (planModeEntry?.data) {
+			planModeEnabled = planModeEntry.data.enabled ?? planModeEnabled;
+			todoItems = planModeEntry.data.todos ?? todoItems;
+			executionMode = planModeEntry.data.executing ?? executionMode;
+			toolsBeforePlanMode = planModeEntry.data.toolsBeforePlanMode ?? toolsBeforePlanMode;
+		}
+
+		const isResume = planModeEntry !== undefined;
+		if (isResume && executionMode && todoItems.length > 0) {
+			let executeIndex = -1;
+			for (let i = entries.length - 1; i >= 0; i--) {
+				const entry = entries[i] as { type: string; customType?: string };
+				if (entry.customType === "rap-plan-mode-execute") {
+					executeIndex = i;
+					break;
+				}
+			}
+			const messages: AssistantMessage[] = [];
+			for (let i = executeIndex + 1; i < entries.length; i++) {
+				const entry = entries[i];
+				if (entry.type === "message" && "message" in entry && isAssistantMessage(entry.message as AgentMessage)) {
+					messages.push(entry.message as AssistantMessage);
+				}
+			}
+			const allText = messages.map(getTextContent).join("\n");
+			markCompletedSteps(allText, todoItems);
+		}
+
+		if (planModeEnabled) enablePlanModeTools();
+		updateStatus(ctx);
+	});
+}
