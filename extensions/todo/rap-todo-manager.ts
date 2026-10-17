@@ -14,13 +14,13 @@ import {
   type RapTodoProject,
   type RapTodoSource,
   type RapTodoStatus,
-} from "./rap-todo-types";
+} from "./rap-todo-types.ts";
 import {
   createEmptyRapTodoProject,
   rapTodoProjectId,
   type RapTodoStorage,
   type RapTodoStorageLoadResult,
-} from "./rap-todo-storage";
+} from "./rap-todo-storage.ts";
 
 export type RapTodoOpResult =
   | { ok: true; project: RapTodoProject }
@@ -308,10 +308,21 @@ export class RapTodoManager {
       unfinishedAuto.every((t) => newTitles.has(t.title));
     if (samePlan) return { ok: true, project: this.project };
 
-    // Preserve completed + manual tasks; drop unfinished automatic tasks.
-    this.project.todos = this.project.todos.filter(
-      (t) => t.status === "completed" || t.source === "manual",
-    );
+    // Decide whether the previous automatic plan is fully complete. When it is,
+    // its completed tasks are dropped so a new plan starts fresh — this prevents
+    // stale completed todos from reappearing after the panel hid them on "all
+    // done". When the previous plan is only partially complete (re-plan mid
+    // work), completed tasks are preserved to keep progress context. Manual
+    // tasks are always preserved regardless.
+    const autoTasks = this.project.todos.filter((t) => t.source === "automatic");
+    const prevPlanFullyComplete =
+      autoTasks.length > 0 && autoTasks.every((t) => t.status === "completed");
+
+    this.project.todos = this.project.todos.filter((t) => {
+      if (t.source === "manual") return true; // always keep user-created tasks
+      if (t.status === "completed") return !prevPlanFullyComplete; // drop if prev plan done
+      return false; // drop unfinished automatic tasks (replaced by the new plan)
+    });
 
     // Title -> id map for dependency resolution.
     const titleToId = new Map<string, string>();

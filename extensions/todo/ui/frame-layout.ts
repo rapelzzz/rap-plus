@@ -2,8 +2,8 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
   DEFAULT_TOKYO_NIGHT_PALETTE,
   type TokyoNightThemePalette,
-} from "./theme-palette";
-import { BOX } from "./ui-primitives";
+} from "./theme-palette.ts";
+import { BOX } from "./ui-primitives.ts";
 
 export type FrameSegmentRole = "top" | "middle" | "bottom" | "standalone";
 

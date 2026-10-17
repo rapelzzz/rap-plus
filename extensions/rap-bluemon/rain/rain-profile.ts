@@ -1,4 +1,4 @@
-import type { TokyoConfig } from "../core/config";
+import type { TokyoConfig } from "../core/config.ts";
 
 export type RainActivity = "idle" | "active" | "tools";
 

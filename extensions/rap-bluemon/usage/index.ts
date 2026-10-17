@@ -1,10 +1,10 @@
-export type { UsageSnapshot, UsageWindow } from "./types";
-export { formatStatus } from "./format";
+export type { UsageSnapshot, UsageWindow } from "./types.ts";
+export { formatStatus } from "./format.ts";
 export {
   createCodexUsageStore,
   isCodexModel,
   type CodexUsageStore,
-} from "./codex";
+} from "./codex.ts";
 export {
   createKimiUsageStore,
   fetchKimiUsage,
@@ -14,4 +14,4 @@ export {
   resolveKimiApiKey,
   type KimiUsageResult,
   type KimiUsageStore,
-} from "./kimi";
+} from "./kimi.ts";

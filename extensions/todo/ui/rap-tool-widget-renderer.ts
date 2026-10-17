@@ -21,7 +21,7 @@
  */
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text, type Component } from "@earendil-works/pi-tui";
-import { registerBashToolRenderer } from "./bash-renderer";
+import { registerBashToolRenderer } from "./bash-renderer.ts";
 import {
   RAP_TOOL_ICONS,
   countLines,
@@ -34,7 +34,7 @@ import {
   str,
   trimTrailingEmpty,
   type RapResultLike,
-} from "./rap-tool-widget-types";
+} from "./rap-tool-widget-types.ts";
 
 // ─── Shared rendering helpers ──────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette";
+import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette.ts";
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
   granularity: "grapheme",

@@ -1,9 +1,9 @@
 import {
   EXT_PREFIX,
   isStaleExtensionContextError,
-} from "../core/errors";
-import { TokyoConfigManager } from "../core/config";
-import type { RainRuntimeProfile } from "./rain-profile";
+} from "../core/errors.ts";
+import { TokyoConfigManager } from "../core/config.ts";
+import type { RainRuntimeProfile } from "./rain-profile.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

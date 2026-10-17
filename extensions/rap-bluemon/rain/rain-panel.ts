@@ -1,18 +1,18 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TokyoConfigManager } from "../core/config";
-import { handleExtensionError } from "../core/errors";
-import { requestHostRender } from "../core/pi-compat";
+import type { TokyoConfigManager } from "../core/config.ts";
+import { handleExtensionError } from "../core/errors.ts";
+import { requestHostRender } from "../core/pi-compat.ts";
 import {
   getFrameContentWidth,
   renderFrameSegment,
-} from "../../todo/ui/frame-layout";
+} from "../../todo/ui/frame-layout.ts";
 import {
   createTokyoNightPalette,
   type TokyoNightThemePalette,
-} from "../../todo/ui/theme-palette";
-import type { RainAnimationManager, RainFrameSnapshot } from "./rain-manager";
+} from "../../todo/ui/theme-palette.ts";
+import type { RainAnimationManager, RainFrameSnapshot } from "./rain-manager.ts";
 
 export const MOON = "🌙";
 export const MOON_COL = 2;

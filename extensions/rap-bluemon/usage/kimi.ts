@@ -22,7 +22,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import fs from "node:fs";
 import path from "node:path";
-import type { UsageSnapshot, UsageWindow } from "./types";
+import type { UsageSnapshot, UsageWindow } from "./types.ts";
 
 const KIMI_USAGE_BASE_URL = "https://api.kimi.com/coding/v1";
 const KIMI_API_ORIGIN = new URL(KIMI_USAGE_BASE_URL).origin;

@@ -18,12 +18,12 @@ import type {
 import type { TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-import type { RapTodoManager } from "./rap-todo-manager";
+import type { RapTodoManager } from "./rap-todo-manager.ts";
 import {
   RAP_TODO_PLAN_GUIDELINE,
   shouldPlanRapTodoNow,
-} from "./rap-todo-planner";
-import type { RapTodoPanelComponent } from "./ui/rap-todo-panel";
+} from "./rap-todo-planner.ts";
+import type { RapTodoPanelComponent } from "./ui/rap-todo-panel.ts";
 
 /** Per-project runtime state. */
 export interface RapTodoSession {

@@ -1,8 +1,8 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import fs from "node:fs";
 import path from "node:path";
-import { handleExtensionError, type ExtensionErrorSink } from "./errors";
-import { DEFAULT_ICON_MODE, type IconMode } from "../../todo/ui/icons";
+import { handleExtensionError, type ExtensionErrorSink } from "./errors.ts";
+import { DEFAULT_ICON_MODE, type IconMode } from "../../todo/ui/icons.ts";
 
 const TOKYO_CONFIG_DIRECTORY = "extensions";
 const TOKYO_CONFIG_FILE = "rap-bluemon.json";

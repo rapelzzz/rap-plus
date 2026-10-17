@@ -4,16 +4,16 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
-import type { TokyoConfigManager } from "../core/config";
-import { handleExtensionError } from "../core/errors";
-import { isFullscreenTui, requestHostRender } from "../core/pi-compat";
+import type { TokyoConfigManager } from "../core/config.ts";
+import { handleExtensionError } from "../core/errors.ts";
+import { isFullscreenTui, requestHostRender } from "../core/pi-compat.ts";
 import {
   composeFrameDock,
   getFrameContentWidth,
   getMainSurfaceFrameRole,
   renderFrameSegment,
-} from "../../todo/ui/frame-layout";
-import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette";
+} from "../../todo/ui/frame-layout.ts";
+import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette.ts";
 
 const FULLSCREEN_EDITOR_MIN_ROWS = 3;
 

@@ -6,59 +6,59 @@ import fs from "node:fs";
 import path from "node:path";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { Text } from "@earendil-works/pi-tui";
-import { readUsageHistory } from "./analytics/usage-history";
-import { TokyoConfigManager } from "./core/config";
-import { detectTerminalTheme } from "./core/terminal-theme";
+import { readUsageHistory } from "./analytics/usage-history.ts";
+import { TokyoConfigManager } from "./core/config.ts";
+import { detectTerminalTheme } from "./core/terminal-theme.ts";
 import {
   createTokyoNightErrorSink,
   flushConsoleLogWrites,
   installConsoleLogBridge,
   type ConsoleLogBridge,
-} from "./core/console-bridge";
+} from "./core/console-bridge.ts";
 import {
   EXT_PREFIX,
   handleExtensionError,
   isStaleExtensionContextError,
   type ExtensionErrorSink,
-} from "./core/errors";
+} from "./core/errors.ts";
 import {
   evaluatePiCompatibility,
   isFullscreenTui,
   requestHostRender,
   type PiCompatibility,
   resolveWorkingIndicatorSetter,
-} from "./core/pi-compat";
-import { RainAnimationManager } from "./rain/rain-manager";
-import { RainPanelComponent } from "./rain/rain-panel";
+} from "./core/pi-compat.ts";
+import { RainAnimationManager } from "./rain/rain-manager.ts";
+import { RainPanelComponent } from "./rain/rain-panel.ts";
 import {
   resolveRainRuntimeProfile,
   type RainActivity,
-} from "./rain/rain-profile";
-import { BorderlessEditor, type BorderlessEditorDependencies } from "./ui/borderless-editor";
-import { NeonStudioComponent } from "./ui/neon-studio";
+} from "./rain/rain-profile.ts";
+import { BorderlessEditor, type BorderlessEditorDependencies } from "./ui/borderless-editor.ts";
+import { NeonStudioComponent } from "./ui/neon-studio.ts";
 import {
   NeonStudioController,
   type NeonStudioConfigChange,
   type NeonStudioThemeChoice,
   type NeonStudioThemeResult,
-} from "./ui/neon-studio-controller";
+} from "./ui/neon-studio-controller.ts";
 import {
   buildStatusLines,
   getSessionStats,
   invalidateSessionStats,
   type LiveSessionUsage,
-} from "./ui/status-bar";
-import { StatusRenderCache } from "./ui/status-render-cache";
-import { RefreshScheduler } from "./ui/refresh-scheduler";
+} from "./ui/status-bar.ts";
+import { StatusRenderCache } from "./ui/status-render-cache.ts";
+import { RefreshScheduler } from "./ui/refresh-scheduler.ts";
 import {
   getFrameContentWidth,
   renderFrameSegment,
-} from "../todo/ui/frame-layout";
+} from "../todo/ui/frame-layout.ts";
 import {
   createTokyoNightPalette,
   type TokyoNightThemePalette,
-} from "../todo/ui/theme-palette";
-import { renderWorkingText } from "./ui/working-shimmer";
+} from "../todo/ui/theme-palette.ts";
+import { renderWorkingText } from "./ui/working-shimmer.ts";
 import {
   createCodexUsageStore,
   createKimiUsageStore,
@@ -68,7 +68,7 @@ import {
   isKimiUsageOriginAllowed,
   resolveKimiApiKey,
   type KimiUsageStore,
-} from "./usage";
+} from "./usage/index.ts";
 
 export type TokyoNightMode = "tui" | "rpc" | "json" | "print";
 

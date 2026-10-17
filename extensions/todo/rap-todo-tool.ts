@@ -18,16 +18,16 @@ import type {
 import type { Component } from "@earendil-works/pi-tui";
 import { Text } from "@earendil-works/pi-tui";
 
-import { renderRapTodoIcon } from "./ui/rap-todo-panel";
+import { renderRapTodoIcon } from "./ui/rap-todo-panel.ts";
 import {
   RAP_TODO_ICONS,
   rapTodoCounts,
   type RapTodoCounts,
   type RapTodoItem,
   type RapTodoStatus,
-} from "./rap-todo-types";
-import { RAP_TODO_TOOL_GUIDELINES } from "./rap-todo-planner";
-import type { RapTodoFeatureDeps } from "./rap-todo-lifecycle";
+} from "./rap-todo-types.ts";
+import { RAP_TODO_TOOL_GUIDELINES } from "./rap-todo-planner.ts";
+import type { RapTodoFeatureDeps } from "./rap-todo-lifecycle.ts";
 
 export interface RapTodoToolDetails {
   action: "plan" | "update" | "list";

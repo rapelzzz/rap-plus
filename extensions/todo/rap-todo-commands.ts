@@ -21,13 +21,13 @@ import type {
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
-import { renderRapTodoIcon } from "./ui/rap-todo-panel";
+import { renderRapTodoIcon } from "./ui/rap-todo-panel.ts";
 import {
   RAP_TODO_ICONS,
   rapTodoCounts,
   type RapTodoItem,
-} from "./rap-todo-types";
-import type { RapTodoFeatureDeps } from "./rap-todo-lifecycle";
+} from "./rap-todo-types.ts";
+import type { RapTodoFeatureDeps } from "./rap-todo-lifecycle.ts";
 
 const LIST_WINDOW = 16;
 

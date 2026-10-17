@@ -13,7 +13,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { registerRapToolWidgetRenderer } from "./ui/rap-tool-widget-renderer";
+import { registerRapToolWidgetRenderer } from "./ui/rap-tool-widget-renderer.ts";
 
 // ─── Mock ExtensionAPI that captures registerToolRenderer calls ────────────
 

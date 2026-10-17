@@ -7,7 +7,7 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai";
-import type { UsageSnapshot, UsageWindow } from "./types";
+import type { UsageSnapshot, UsageWindow } from "./types.ts";
 
 export interface CodexUsageStore {
   captureFromHeaders(headers: Record<string, string>): boolean;

@@ -14,8 +14,8 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { registerRapTodoFeature } from "./rap-todo-index";
-import { registerRapToolWidgetRenderer } from "./ui/rap-tool-widget-renderer";
+import { registerRapTodoFeature } from "./rap-todo-index.ts";
+import { registerRapToolWidgetRenderer } from "./ui/rap-tool-widget-renderer.ts";
 
 export default function registerRapTodoExtension(pi: ExtensionAPI): void {
   // RAP Todo System: compact panel + /todo commands + model-callable rap_todo tool.

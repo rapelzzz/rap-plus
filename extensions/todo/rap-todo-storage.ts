@@ -21,7 +21,7 @@ import {
   type RapTodoProject,
   type RapTodoSource,
   type RapTodoStatus,
-} from "./rap-todo-types";
+} from "./rap-todo-types.ts";
 
 /** Runtime data filename (not a repository-managed source file, so "rap" rule N/A). */
 export const RAP_TODO_DATA_DIR = path.join(".pi", "todo-system");

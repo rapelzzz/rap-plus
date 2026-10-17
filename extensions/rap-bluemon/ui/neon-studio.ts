@@ -11,29 +11,29 @@ import {
   type DashboardRange,
   type UsageDashboardSummary,
   type UsageHistory,
-} from "../analytics/usage-history";
+} from "../analytics/usage-history.ts";
 import {
   renderDottedTrendChart,
   type TrendSeries,
-} from "../analytics/trend-chart";
-import { isFullscreenTui } from "../core/pi-compat";
+} from "../analytics/trend-chart.ts";
+import { isFullscreenTui } from "../core/pi-compat.ts";
 import {
   NEON_STUDIO_QUOTA_SETTINGS,
   NEON_STUDIO_STATUS_SETTINGS,
   NeonStudioController,
   type NeonStudioSection,
   type NeonStudioThemeChoice,
-} from "./neon-studio-controller";
+} from "./neon-studio-controller.ts";
 import {
   composeFrameDock,
   getFrameContentWidth,
   getMainSurfaceFrameRole,
   renderFrameSegment,
-} from "../../todo/ui/frame-layout";
+} from "../../todo/ui/frame-layout.ts";
 import {
   createTokyoNightPalette,
   type TokyoNightThemePalette,
-} from "../../todo/ui/theme-palette";
+} from "../../todo/ui/theme-palette.ts";
 
 type StudioRow = {
   label: string;

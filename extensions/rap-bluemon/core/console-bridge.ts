@@ -2,7 +2,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import fs from "node:fs";
 import path from "node:path";
 import { format as formatConsoleArguments } from "node:util";
-import { EXT_PREFIX, type ExtensionErrorSink } from "./errors";
+import { EXT_PREFIX, type ExtensionErrorSink } from "./errors.ts";
 
 export const TOKYO_NIGHT_LOG_FILE = "pi-tokyo-night.log";
 export const TOKYO_NIGHT_LOG_MAX_BYTES = 1024 * 1024;

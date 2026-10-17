@@ -4,7 +4,7 @@ import {
   fgRgb,
   RESET_BG,
   RESET_FG,
-} from "./ui-primitives";
+} from "./ui-primitives.ts";
 
 export type TokyoNightForegroundRole =
   | "rain"

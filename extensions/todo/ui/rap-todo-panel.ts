@@ -20,7 +20,7 @@ import {
   rapTodoCounts,
   type RapTodoItem,
   type RapTodoStatus,
-} from "../rap-todo-types";
+} from "../rap-todo-types.ts";
 
 export interface RapTodoPanelComponent {
   setTodos(todos: RapTodoItem[], theme: Theme): void;

@@ -3,7 +3,7 @@
  * can display Codex and Kimi quotas through the same formatStatus().
  */
 
-import type { UsageSnapshot } from "./types";
+import type { UsageSnapshot } from "./types.ts";
 
 function windowLabel(minutes: number): string {
   if (minutes === 300) return "5h";

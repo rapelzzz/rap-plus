@@ -21,7 +21,7 @@ import {
   safeExpandHint,
   trimTrailingEmpty,
   type RapResultLike,
-} from "./rap-tool-widget-types";
+} from "./rap-tool-widget-types.ts";
 
 type BashArgs = { command: string; timeout?: number };
 

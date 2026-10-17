@@ -14,21 +14,21 @@ import {
   type CodexUsageStore,
   type KimiUsageStore,
   type UsageSnapshot,
-} from "../usage";
+} from "../usage/index.ts";
 import {
   DEFAULT_STATUS_MODULES,
   type StatusModulesConfig,
   type TokyoConfigManager,
-} from "../core/config";
-import { handleExtensionError } from "../core/errors";
-import { resolveIcons, type StatusIcons } from "../../todo/ui/icons";
+} from "../core/config.ts";
+import { handleExtensionError } from "../core/errors.ts";
+import { resolveIcons, type StatusIcons } from "../../todo/ui/icons.ts";
 import {
   createTokyoNightPalette,
   type TokyoNightBackgroundRole,
   type TokyoNightForegroundRole,
   type TokyoNightThemePalette,
-} from "../../todo/ui/theme-palette";
-import { RESET_BG } from "../../todo/ui/ui-primitives";
+} from "../../todo/ui/theme-palette.ts";
+import { RESET_BG } from "../../todo/ui/ui-primitives.ts";
 
 type Module = {
   text: string;

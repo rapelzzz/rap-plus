@@ -9,7 +9,7 @@
  * `rap_todo` tool (high-quality breakdown). The heuristic only decides WHEN.
  */
 
-import type { RapTodoManager } from "./rap-todo-manager";
+import type { RapTodoManager } from "./rap-todo-manager.ts";
 
 const COMPLEX_KEYWORDS: readonly RegExp[] = [
   /\brefactor(ing)?\b/i,

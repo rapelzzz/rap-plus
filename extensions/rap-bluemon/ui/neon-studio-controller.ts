@@ -4,8 +4,8 @@ import {
   type StatusModulesConfig,
   type TokyoConfig,
   type TokyoConfigManager,
-} from "../core/config";
-import type { ExtensionErrorSink } from "../core/errors";
+} from "../core/config.ts";
+import type { ExtensionErrorSink } from "../core/errors.ts";
 
 export type NeonStudioSection = "appearance" | "status" | "usage" | "rain";
 export type NeonStudioThemeChoice = "automatic" | "dark" | "light";

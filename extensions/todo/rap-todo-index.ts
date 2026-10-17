@@ -10,16 +10,16 @@ import type { ExtensionAPI, ExtensionUIContext, Theme } from "@earendil-works/pi
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import path from "node:path";
 
-import { createRapTodoPanelComponent } from "./ui/rap-todo-panel";
-import { RapTodoManager } from "./rap-todo-manager";
-import { createRapTodoStorage } from "./rap-todo-storage";
+import { createRapTodoPanelComponent } from "./ui/rap-todo-panel.ts";
+import { RapTodoManager } from "./rap-todo-manager.ts";
+import { createRapTodoStorage } from "./rap-todo-storage.ts";
 import {
   registerRapTodoLifecycle,
   type RapTodoFeatureDeps,
   type RapTodoSession,
-} from "./rap-todo-lifecycle";
-import { registerRapTodoTool } from "./rap-todo-tool";
-import { registerRapTodoCommands } from "./rap-todo-commands";
+} from "./rap-todo-lifecycle.ts";
+import { registerRapTodoTool } from "./rap-todo-tool.ts";
+import { registerRapTodoCommands } from "./rap-todo-commands.ts";
 
 const RAP_TODO_WIDGET_KEY = "rap-todo";
 
