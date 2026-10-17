@@ -76,7 +76,7 @@ const USAGE_HISTORY_CACHE_VERSION = 1;
 const WINDOWS_RENAME_RETRY_DELAYS_MS = [50, 100, 200, 400] as const;
 
 export function getUsageHistoryCachePath(agentDir = getAgentDir()): string {
-  return join(agentDir, "extensions", "pi-tokyo-night-usage-history-cache.json");
+  return join(agentDir, "extensions", "rap-bluemon-usage-history.json");
 }
 
 function startOfDay(value: Date): number {

@@ -5,7 +5,7 @@ import { handleExtensionError, type ExtensionErrorSink } from "./errors";
 import { DEFAULT_ICON_MODE, type IconMode } from "../../todo/ui/icons";
 
 const TOKYO_CONFIG_DIRECTORY = "extensions";
-const TOKYO_CONFIG_FILE = "pi-tokyo-night.json";
+const TOKYO_CONFIG_FILE = "rap-bluemon.json";
 
 function getTokyoConfigPath(): string {
   return path.join(getAgentDir(), TOKYO_CONFIG_DIRECTORY, TOKYO_CONFIG_FILE);
@@ -39,7 +39,7 @@ export interface TokyoConfig {
   kimiQuota: boolean;
   /** Icon set used by the status bar. */
   iconMode: IconMode;
-  /** Visibility of status bar modules, configured in pi-tokyo-night.json. */
+  /** Visibility of status bar modules, configured in rap-bluemon.json. */
   statusModules: Readonly<StatusModulesConfig>;
   /** Select automatic, manual, or a static scene without animation refreshes. */
   rainMode: RainMode;

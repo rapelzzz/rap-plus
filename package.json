@@ -12,9 +12,9 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/*.ts",
-      "./extensions/rap-bluemon",
-      "./extensions/todo"
+      "./extensions/rap-web-search.ts",
+      "./extensions/rap-bluemon/index.ts",
+      "./extensions/todo/index.ts"
     ],
     "themes": [
       "./themes/*.json"
