@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# build / artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# logs & os
+*.log
+.DS_Store
+Thumbs.db
+
+# editor
+.idea/
+.vscode/
+*.swp

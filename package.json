@@ -1,0 +1,36 @@
+{
+  "name": "rap-plus",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RAP+ — Pi extensions & theme pack (bluemon studio, todo system, widget renderer, web search).",
+  "type": "module",
+  "keywords": ["pi-package"],
+  "homepage": "https://github.com/rapelzzz/rap-plus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rapelzzz/rap-plus.git"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/*.ts",
+      "./extensions/rap-bluemon",
+      "./extensions/todo"
+    ],
+    "themes": [
+      "./themes/*.json"
+    ]
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
