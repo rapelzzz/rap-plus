@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # patch-pi-logo.sh — recolor the Pi startup logo (▀▀█ / "Pi" wordmark) to match
-# the rap-bluemon CC Dark theme.
+# the rap-bluemon theme.
 #
 # Why this exists:
 #   Pi's logo colors are hardcoded in its bundled chunk
@@ -8,7 +8,7 @@
 #   This script surgically rewrites those three rgbColor() triplets so the
 #   logo follows the rap-bluemon vivid-blue palette.
 #
-# Colors (CC Dark "blue gradient", Option A):
+# Colors (rap-bluemon blue):
 #   CORAL  rgb(228,138,122) -> rgb(79,158,255)   #4F9EFF  (accent blue)
 #   BLUE   rgb(79,142,179)  -> rgb(31,111,235)   #1F6FEB  (deep blue)
 #   YELLOW rgb(234,182,93)  -> rgb(121,192,255)  #79C0FF  (light blue)

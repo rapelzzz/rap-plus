@@ -1,6 +1,6 @@
 /**
  * Runtime logo recolor — keeps the Pi startup logo recolored to the rap-bluemon
- * CC Dark palette across `pi update`s.
+ * blue palette across `pi update`s.
  *
  * Pi's logo colors (▀▀█ / "Pi" wordmark) are hardcoded in its bundled chunk
  * (`dist/bundle/chunks/*.js`) and are NOT themeable. The package `postinstall`
