@@ -1,8 +1,8 @@
 /**
  * Terminal pool for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` terminal tooling. Manages persistent
- * non-interactive shell sessions (one `bash` per session) that stay alive
+ * Manages persistent non-interactive shell sessions (one `bash` per
+ * session) that stay alive
  * across `send` calls, so the model can run sequences of commands in a
  * shared working directory / env. Each `send` waits for a unique sentinel
  * marker (via async polling that yields to the event loop) so the returned

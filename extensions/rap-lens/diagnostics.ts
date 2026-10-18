@@ -1,12 +1,9 @@
 /**
  * Diagnostics engine for rap-lens (focused subset).
  *
- * Behavioral target: `pi-lens` (apmantza). The full pi-lens surface (LSP
- * navigation, impact cascade, ast-grep/tree-sitter, symbol_search/module_map/
- * read_symbol, /lens-map, autofix) is NOT implemented here — see
- * research/feature-parity.md. This module ships: dynamic tool/dependency
- * detection + language linter/type-checker invocation + output parsing +
- * diagnostic triage.
+ * Dynamic tool/dependency detection + language linter/type-checker
+ * invocation + output parsing + diagnostic triage. LSP navigation, symbol
+ * discovery, ast-grep, and autofix live in sibling modules.
  *
  * Pure-ish (node builtins + shared subprocess) → unit-testable.
  */

@@ -31,8 +31,8 @@ import {
   renderFrameSegment,
 } from "../../todo/ui/frame-layout.ts";
 import {
-  createTokyoNightPalette,
-  type TokyoNightThemePalette,
+  createRapPalette,
+  type RapThemePalette,
 } from "../../todo/ui/theme-palette.ts";
 
 type StudioRow = {
@@ -209,7 +209,7 @@ export class NeonStudioComponent implements Component {
     if (outputWidth === 0) return this.withFullscreenStatus([], outputWidth);
 
     const renderTheme = this.getRenderTheme();
-    const palette = createTokyoNightPalette(renderTheme);
+    const palette = createRapPalette(renderTheme);
     const activeSection = SECTIONS[this.sectionIndex];
     const config = this.controller.config.get();
     const contentWidth = getFrameContentWidth(outputWidth, config.editorFrame);
@@ -572,14 +572,14 @@ export class NeonStudioComponent implements Component {
   private withFullscreenStatus(
     lines: string[],
     width: number,
-    palette?: TokyoNightThemePalette,
+    palette?: RapThemePalette,
   ): string[] {
     if (!isFullscreenTui(this.tui)) return lines;
     return composeFrameDock({
       width,
       lines,
       frameEnabled: this.controller.config.get().editorFrame,
-      palette: palette ?? createTokyoNightPalette(this.getRenderTheme()),
+      palette: palette ?? createRapPalette(this.getRenderTheme()),
       renderBottom: () => this.options.renderFullscreenStatus?.(width) ?? [],
     });
   }
@@ -604,8 +604,8 @@ export class NeonStudioComponent implements Component {
       const themeLabel = this.controller.themeChoice === "automatic"
         ? "Automatic"
         : this.controller.themeChoice === "dark"
-          ? "Tokyo Night Dark"
-          : "Tokyo Night Light";
+          ? "Rap Bluemon Dark"
+          : "Rap Bluemon Light";
       return [
         {
           label: "Theme",

@@ -1,12 +1,10 @@
 /**
  * rap-plan-mode — read-only planning mode for Pi.
  *
- * Behavioral parity target: `pi-plan-mode` (qmx, npm) + Pi's own bundled
- * example `examples/extensions/plan-mode`. Toggleable read-only mode that
- * TECHNICALLY blocks write/edit tools (via setActiveTools) and destructive
- * bash (via tool_call handler). Supports numbered plan extraction, [DONE:n]
- * progress tracking, a progress widget, session persistence, a shortcut, and
- * a `--plan` startup flag.
+ * Toggleable read-only mode that TECHNICALLY blocks write/edit tools (via
+ * setActiveTools) and destructive bash (via tool_call handler). Supports
+ * numbered plan extraction, [DONE:n] progress tracking, a progress widget,
+ * session persistence, a shortcut, and a `--plan` startup flag.
  *
  * Safety invariant: while active, the model cannot write source files — this
  * is enforced at the tool layer, not merely by instruction.
@@ -130,7 +128,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		persistState();
 	}
 
-	pi.registerCommand("plan", {
+	pi.registerCommand("rap-plan", {
 		description: "Toggle rap-plan-mode (read-only exploration)",
 		handler: async (_args, ctx) => togglePlanMode(ctx),
 	});

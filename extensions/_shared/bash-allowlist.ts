@@ -1,8 +1,7 @@
 /**
  * Bash command safety classifier.
  *
- * Adapted from Pi's bundled `examples/extensions/plan-mode/utils.ts` (verified
- * reference). Classifies a shell command as read-only-safe or destructive.
+ * Classifies a shell command as read-only-safe or destructive.
  *
  * Pure (no Pi imports) → unit-testable.
  */

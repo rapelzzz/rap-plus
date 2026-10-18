@@ -4,18 +4,18 @@ import path from "node:path";
 import { format as formatConsoleArguments } from "node:util";
 import { EXT_PREFIX, type ExtensionErrorSink } from "./errors.ts";
 
-export const TOKYO_NIGHT_LOG_FILE = "pi-tokyo-night.log";
-export const TOKYO_NIGHT_LOG_MAX_BYTES = 1024 * 1024;
+export const RAP_BLUEMON_LOG_FILE = "rap-bluemon.log";
+export const RAP_LOG_MAX_BYTES = 1024 * 1024;
 
-const TOKYO_NIGHT_LOG_RETAIN_BYTES = TOKYO_NIGHT_LOG_MAX_BYTES / 2;
-const TOKYO_NIGHT_LOG_BATCH_BYTES = 64 * 1024;
+const RAP_LOG_RETAIN_BYTES = RAP_LOG_MAX_BYTES / 2;
+const RAP_LOG_BATCH_BYTES = 64 * 1024;
 // At most 1 MiB waits in memory and at most 1 MiB is being written. The
 // record limit includes both queues; oversized records are written alone.
-const TOKYO_NIGHT_LOG_MAX_PENDING_BYTES = TOKYO_NIGHT_LOG_MAX_BYTES;
-const TOKYO_NIGHT_LOG_MAX_ENTRIES = 2_048;
-const TOKYO_NIGHT_LOG_MAX_PATHS = 128;
-const GLOBAL_BRIDGE_KEY = Symbol.for("pi-tokyo-night.console-log-bridge");
-const GLOBAL_WRITER_KEY = Symbol.for("pi-tokyo-night.console-log-writer");
+const RAP_LOG_MAX_PENDING_BYTES = RAP_LOG_MAX_BYTES;
+const RAP_LOG_MAX_ENTRIES = 2_048;
+const RAP_LOG_MAX_PATHS = 128;
+const GLOBAL_BRIDGE_KEY = Symbol.for("rap-bluemon.console-log-bridge");
+const GLOBAL_WRITER_KEY = Symbol.for("rap-bluemon.console-log-writer");
 
 const CONSOLE_METHODS = [
   ["log", "LOG"],
@@ -39,7 +39,7 @@ export interface ConsoleLogBridgeOptions {
   now?: () => Date;
 }
 
-export interface TokyoNightErrorSinkOptions {
+export interface RapErrorSinkOptions {
   logFilePath?: string;
   appendLine?: AppendLogLine;
   now?: () => Date;
@@ -113,12 +113,12 @@ function getLogWriterState(): LogWriterState {
   };
 }
 
-export function getTokyoNightLogPath(agentDir = getAgentDir()): string {
-  return path.join(agentDir, TOKYO_NIGHT_LOG_FILE);
+export function getRapLogPath(agentDir = getAgentDir()): string {
+  return path.join(agentDir, RAP_BLUEMON_LOG_FILE);
 }
 
 function resolveLogFilePath(): string {
-  return getTokyoNightLogPath();
+  return getRapLogPath();
 }
 
 function truncateUtf8ToBytes(value: string, maxBytes: number): string {
@@ -142,7 +142,7 @@ async function readRecentLogTail(filePath: string): Promise<string> {
   let file: fs.promises.FileHandle | undefined;
   try {
     const stats = await fs.promises.stat(filePath);
-    const bytesToRead = Math.min(stats.size, TOKYO_NIGHT_LOG_RETAIN_BYTES);
+    const bytesToRead = Math.min(stats.size, RAP_LOG_RETAIN_BYTES);
     if (bytesToRead === 0) return "";
 
     const tailStart = stats.size - bytesToRead;
@@ -164,7 +164,7 @@ async function readRecentLogTail(filePath: string): Promise<string> {
     }
     return truncateUtf8ToBytes(
       retainedBytes.toString("utf8"),
-      TOKYO_NIGHT_LOG_RETAIN_BYTES,
+      RAP_LOG_RETAIN_BYTES,
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
@@ -196,7 +196,7 @@ async function appendBoundedLogLine(filePath: string, line: string): Promise<voi
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
 
-  if (currentSize + Buffer.byteLength(line, "utf8") <= TOKYO_NIGHT_LOG_MAX_BYTES) {
+  if (currentSize + Buffer.byteLength(line, "utf8") <= RAP_LOG_MAX_BYTES) {
     await fs.promises.appendFile(filePath, line, "utf8");
     return;
   }
@@ -206,7 +206,7 @@ async function appendBoundedLogLine(filePath: string, line: string): Promise<voi
   const trimMarker = `[${new Date().toISOString()}] WARN ${EXT_PREFIX} log limit reached; discarded oldest log entries.\n`;
   const availableEntryBytes = Math.max(
     0,
-    TOKYO_NIGHT_LOG_MAX_BYTES -
+    RAP_LOG_MAX_BYTES -
       Buffer.byteLength(retained, "utf8") -
       Buffer.byteLength(trimMarker, "utf8"),
   );
@@ -217,7 +217,7 @@ async function appendBoundedLogLine(filePath: string, line: string): Promise<voi
 function rememberRecentPath(paths: Set<string>, value: string): void {
   paths.delete(value);
   paths.add(value);
-  if (paths.size > TOKYO_NIGHT_LOG_MAX_PATHS) paths.delete(paths.values().next().value!);
+  if (paths.size > RAP_LOG_MAX_PATHS) paths.delete(paths.values().next().value!);
 }
 
 function hasRecentPath(paths: Set<string>, value: string): boolean {
@@ -230,12 +230,12 @@ function appendLogLine(filePath: string, line: string): void {
   const state = getLogWriterState();
   if (hasRecentPath(state.disabledFiles, filePath)) return;
   const sequence = ++state.lastSequence;
-  const boundedLine = limitLogEntry(line, TOKYO_NIGHT_LOG_MAX_PENDING_BYTES);
+  const boundedLine = limitLogEntry(line, RAP_LOG_MAX_PENDING_BYTES);
   const bytes = Buffer.byteLength(boundedLine, "utf8");
   const entry = { sequence, filePath, line: boundedLine, bytes };
   while (
-    state.pendingBytes + bytes > TOKYO_NIGHT_LOG_MAX_PENDING_BYTES ||
-    state.pending.size + (state.inFlight?.entries.length ?? 0) >= TOKYO_NIGHT_LOG_MAX_ENTRIES
+    state.pendingBytes + bytes > RAP_LOG_MAX_PENDING_BYTES ||
+    state.pending.size + (state.inFlight?.entries.length ?? 0) >= RAP_LOG_MAX_ENTRIES
   ) {
     const oldest = state.pending.values().next().value;
     if (!oldest) {
@@ -257,7 +257,7 @@ function recordDroppedLogEntry(state: LogWriterState, entry: PendingLogEntry): v
   if (dropped) {
     dropped.count++;
     dropped.firstSequence = Math.min(dropped.firstSequence, entry.sequence);
-  } else if (state.dropped.size >= TOKYO_NIGHT_LOG_MAX_PATHS) {
+  } else if (state.dropped.size >= RAP_LOG_MAX_PATHS) {
     let oldest: DroppedLogEntries | undefined;
     for (const existing of state.dropped.values()) {
       if (!oldest || existing.firstSequence < oldest.firstSequence) oldest = existing;
@@ -315,13 +315,13 @@ function takeLogBatch(state: LogWriterState): PendingLogEntry[] {
     if (
       entry.filePath !== first.filePath ||
       entry.sequence > flushBoundary ||
-      (entries.length > 0 && bytes + entry.bytes > TOKYO_NIGHT_LOG_BATCH_BYTES)
+      (entries.length > 0 && bytes + entry.bytes > RAP_LOG_BATCH_BYTES)
     ) break;
     entries.push(entry);
     bytes += entry.bytes;
     state.pending.delete(entry.sequence);
     state.pendingBytes -= entry.bytes;
-    if (bytes >= TOKYO_NIGHT_LOG_BATCH_BYTES) break;
+    if (bytes >= RAP_LOG_BATCH_BYTES) break;
   }
   return entries;
 }
@@ -347,7 +347,7 @@ function discardPendingLogFile(state: LogWriterState, filePath: string): void {
     if (state.disabledFiles.has(dropped.filePath)) continue;
     if (!recipient || dropped.firstSequence < recipient.firstSequence) recipient = dropped;
   }
-  if (!recipient && state.dropped.size < TOKYO_NIGHT_LOG_MAX_PATHS) {
+  if (!recipient && state.dropped.size < RAP_LOG_MAX_PATHS) {
     for (const entry of state.pending.values()) {
       if (state.disabledFiles.has(entry.filePath)) continue;
       recipient = { filePath: entry.filePath, firstSequence, count: 0 };
@@ -420,8 +420,8 @@ export async function flushConsoleLogWrites(): Promise<void> {
   });
 }
 
-export function createTokyoNightErrorSink(
-  options: TokyoNightErrorSinkOptions = {},
+export function createRapErrorSink(
+  options: RapErrorSinkOptions = {},
 ): ExtensionErrorSink {
   const writeLine = options.appendLine ?? appendLogLine;
   const logFilePath = options.logFilePath ?? resolveLogFilePath();
@@ -551,7 +551,7 @@ export function installConsoleLogBridge(
     [GLOBAL_BRIDGE_KEY]?: GlobalBridgeState;
   };
   const existing = globalObject[GLOBAL_BRIDGE_KEY];
-  const owner = Symbol("pi-tokyo-night-console-bridge-owner");
+  const owner = Symbol("rap-bluemon-console-bridge-owner");
 
   if (existing) {
     existing.handles.add(owner);

@@ -2,8 +2,8 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_STATUS_MODULES,
   type StatusModulesConfig,
-  type TokyoConfig,
-  type TokyoConfigManager,
+  type RapConfig,
+  type RapConfigManager,
 } from "../core/config.ts";
 import type { ExtensionErrorSink } from "../core/errors.ts";
 
@@ -24,7 +24,7 @@ interface NeonStudioCloseResult {
 export type NeonStudioConfigChange =
   | {
       kind: "config";
-      key: Exclude<keyof TokyoConfig, "statusModules">;
+      key: Exclude<keyof RapConfig, "statusModules">;
     }
   | {
       kind: "status";
@@ -64,14 +64,14 @@ export const NEON_STUDIO_QUOTA_SETTINGS: ReadonlyArray<{
 
 const CONFIG_SNAPSHOT_KEYS = Object.keys(DEFAULT_CONFIG).filter(
   (key) => key !== "statusModules",
-) as Array<Exclude<keyof TokyoConfig, "statusModules">>;
+) as Array<Exclude<keyof RapConfig, "statusModules">>;
 
 const STATUS_MODULE_KEYS = Object.keys(
   DEFAULT_STATUS_MODULES,
 ) as Array<keyof StatusModulesConfig>;
 
 export interface NeonStudioControllerDependencies {
-  config: TokyoConfigManager;
+  config: RapConfigManager;
   errorSink: ExtensionErrorSink;
   notify(message: string, level: "info" | "warning" | "error"): void;
   onConfigChange(change: NeonStudioConfigChange): void;
@@ -88,7 +88,7 @@ export class NeonStudioController {
   private closing = false;
   private forceClosing = false;
   private closePromise: Promise<boolean> | undefined;
-  private readonly openingConfig: Readonly<TokyoConfig>;
+  private readonly openingConfig: Readonly<RapConfig>;
   private readonly persistedTheme: NeonStudioThemeChoice | undefined;
   private selectedTheme: NeonStudioThemeChoice;
   private themeChanged = false;
@@ -102,7 +102,7 @@ export class NeonStudioController {
     this.selectedTheme = dependencies.initialThemeChoice ?? "automatic";
   }
 
-  get config(): TokyoConfigManager {
+  get config(): RapConfigManager {
     return this.dependencies.config;
   }
 
@@ -204,8 +204,8 @@ export class NeonStudioController {
       this.restoreThemePreview();
       this.safeNotify(
         this.forceClosing
-          ? "Could not save Tokyo Night settings before Neon Studio closed."
-          : "Could not save Tokyo Night settings. Neon Studio remains open.",
+          ? "Could not save Rap Bluemon settings before Neon Studio closed."
+          : "Could not save Rap Bluemon settings. Neon Studio remains open.",
       );
       if (!this.forceClosing) return { saved: false, configSaved, closeAttempted: false };
       this.restoreOpeningConfig();
@@ -235,8 +235,8 @@ export class NeonStudioController {
       this.safeNotify(
         themeResult.error ??
           (this.forceClosing
-            ? "Could not save the Tokyo Night theme before Neon Studio closed."
-            : "Could not save the Tokyo Night theme. Neon Studio remains open."),
+            ? "Could not save the Rap Bluemon theme before Neon Studio closed."
+            : "Could not save the Rap Bluemon theme. Neon Studio remains open."),
       );
       if (!this.forceClosing) return { saved: false, configSaved, closeAttempted: false };
     }
@@ -286,7 +286,7 @@ export class NeonStudioController {
     }
     if (!result.success) {
       this.safeNotify(
-        result.error ?? "Could not restore the opening Tokyo Night theme.",
+        result.error ?? "Could not restore the opening Rap Bluemon theme.",
       );
     }
   }
@@ -336,7 +336,7 @@ export class NeonStudioController {
         lastError = result.error;
       }
       this.safeNotify(
-        lastError ?? "Could not preview an available Tokyo Night theme.",
+        lastError ?? "Could not preview an available Rap Bluemon theme.",
       );
       return false;
     }

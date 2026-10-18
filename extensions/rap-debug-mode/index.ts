@@ -1,13 +1,13 @@
 /**
  * rap-debug-mode — evidence-first debugging methodology enforcement.
  *
- * Behavioral target: `pi-debug-mode` (liush2yuxjtu). When enabled via `/debug`,
- * the evidence-first methodology is injected into the session context (once),
+ * When enabled via `/rap-debug`, the evidence-first methodology is injected
+ * into the session context (once),
  * and a `debug_checkpoint` tool records progress and gates the "fix" stage
  * behind a confirmed reproduction (safety invariant: no fixing before repro).
  *
  * Commands/tools:
- *   /debug        — toggle debug-mode on/off (injects methodology when on).
+ *   /rap-debug     — toggle debug-mode on/off (injects methodology when on).
  *   debug_checkpoint (tool) — report evidence/hypothesis/probe/repro/fix/verify.
  */
 
@@ -25,7 +25,7 @@ export default function rapDebugMode(pi: ExtensionAPI): void {
 	let active = false;
 	let state: DebugState = freshDebugState();
 
-	pi.registerCommand("debug", {
+	pi.registerCommand("rap-debug", {
 		description: "Toggle evidence-first debug mode on/off.",
 		handler: async (_args, ctx) => {
 			active = !active;

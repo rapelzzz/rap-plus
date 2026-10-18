@@ -6,7 +6,7 @@ import {
   RESET_FG,
 } from "./ui-primitives.ts";
 
-export type TokyoNightForegroundRole =
+export type RapForegroundRole =
   | "rain"
   | "star"
   | "moon"
@@ -25,7 +25,7 @@ export type TokyoNightForegroundRole =
   | "statusCost"
   | "statusContext";
 
-export type TokyoNightBackgroundRole =
+export type RapBackgroundRole =
   | "model"
   | "thinking"
   | "path"
@@ -34,13 +34,13 @@ export type TokyoNightBackgroundRole =
   | "tokens"
   | "cost";
 
-export interface TokyoNightThemePalette {
-  fg(role: TokyoNightForegroundRole, text: string): string;
+export interface RapThemePalette {
+  fg(role: RapForegroundRole, text: string): string;
   workingPulse(text: string, intensity: number): string;
-  bg(role: TokyoNightBackgroundRole, text: string): string;
+  bg(role: RapBackgroundRole, text: string): string;
   transition(
-    from: TokyoNightBackgroundRole | null,
-    to: TokyoNightBackgroundRole | null,
+    from: RapBackgroundRole | null,
+    to: RapBackgroundRole | null,
     text: string,
   ): string;
 }
@@ -49,7 +49,7 @@ type ThemeForeground = Parameters<Theme["fg"]>[0];
 type RgbColor = readonly [number, number, number];
 
 const THEME_FOREGROUND_TOKENS: Partial<
-  Record<TokyoNightForegroundRole, ThemeForeground>
+  Record<RapForegroundRole, ThemeForeground>
 > = {
   rain: "thinkingLow",
   star: "accent",
@@ -59,11 +59,11 @@ const THEME_FOREGROUND_TOKENS: Partial<
   workingPurple: "thinkingMedium",
 };
 
-// Tokyo Night's status bar and shared frame retain a stable visual identity.
+// Rap Bluemon's status bar and shared frame retain a stable visual identity.
 // Foregrounds rendered directly on the terminal surface follow the active
 // Theme so they remain legible across light and dark backgrounds.
 const STATIC_FOREGROUND_COLORS: Partial<
-  Record<TokyoNightForegroundRole, RgbColor>
+  Record<RapForegroundRole, RgbColor>
 > = {
   frame: [53, 61, 119], // #353d77
   statusModel: [200, 200, 255],
@@ -88,7 +88,7 @@ const WORKING_TEXT_COLORS = {
 } as const satisfies Record<"dark" | "light", Record<"base" | "shimmer", RgbColor>>;
 
 const STATIC_BACKGROUND_COLORS: Record<
-  TokyoNightBackgroundRole,
+  RapBackgroundRole,
   RgbColor
 > = {
   model: [27, 45, 105], // #1b2d69
@@ -118,8 +118,8 @@ function interpolateRgb(from: RgbColor, to: RgbColor, intensity: number): RgbCol
 }
 
 function renderChromeTransition(
-  from: TokyoNightBackgroundRole | null,
-  to: TokyoNightBackgroundRole | null,
+  from: RapBackgroundRole | null,
+  to: RapBackgroundRole | null,
   text: string,
 ): string {
   const background = to === null
@@ -132,12 +132,12 @@ function renderChromeTransition(
 }
 
 /**
- * Resolve surface accents through the active Theme while keeping Tokyo Night's
+ * Resolve surface accents through the active Theme while keeping Rap Bluemon's
  * status and frame chrome independent from generic content-surface tokens.
  */
-export function createTokyoNightPalette(
+export function createRapPalette(
   theme: Theme,
-): TokyoNightThemePalette {
+): RapThemePalette {
   const workingColors = theme.name?.includes("light")
     ? WORKING_TEXT_COLORS.light
     : WORKING_TEXT_COLORS.dark;
@@ -173,6 +173,6 @@ export function createTokyoNightPalette(
 
 /** Stable chrome palette for public frame helpers without a host Theme. */
 // SAFETY: the fallback palette only calls fg; the remaining Theme methods are intentionally unavailable.
-export const DEFAULT_TOKYO_NIGHT_PALETTE = createTokyoNightPalette({
+export const DEFAULT_RAP_PALETTE = createRapPalette({
   fg: (_color: string, text: string) => text,
 } as unknown as Theme);

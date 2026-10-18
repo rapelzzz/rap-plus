@@ -4,17 +4,17 @@ import path from "node:path";
 import { handleExtensionError, type ExtensionErrorSink } from "./errors.ts";
 import { DEFAULT_ICON_MODE, type IconMode } from "../../todo/ui/icons.ts";
 
-const TOKYO_CONFIG_DIRECTORY = "extensions";
-const TOKYO_CONFIG_FILE = "rap-bluemon.json";
+const RAP_CONFIG_DIRECTORY = "extensions";
+const RAP_CONFIG_FILE = "rap-bluemon.json";
 
-function getTokyoConfigPath(): string {
-  return path.join(getAgentDir(), TOKYO_CONFIG_DIRECTORY, TOKYO_CONFIG_FILE);
+function getRapConfigPath(): string {
+  return path.join(getAgentDir(), RAP_CONFIG_DIRECTORY, RAP_CONFIG_FILE);
 }
 
-// ── Tokyo Night User Config ────────────────────────────────────────────────
-// Persisted user personalization for the Tokyo Night extension. The panel
+// ── Rap Bluemon User Config ────────────────────────────────────────────────
+// Persisted user personalization for the Rap Bluemon extension. The panel
 // toggle and rain animation parameters can be changed at runtime through the
-// /tokyo-night Neon Studio surface.
+// /rap-bluemon Neon Studio surface.
 export interface StatusModulesConfig {
   model: boolean;
   thinking: boolean;
@@ -28,10 +28,10 @@ export interface StatusModulesConfig {
 
 export type RainMode = "auto" | "manual" | "static";
 
-export interface TokyoConfig {
+export interface RapConfig {
   /** Show the top rain/moon/stars panel. */
   panel: boolean;
-  /** Show one continuous frame around the Tokyo Night interface surfaces. */
+  /** Show one continuous frame around the Rap Bluemon interface surfaces. */
   editorFrame: boolean;
   /** Show Codex limit in the status bar (requires Pi transport=sse). */
   codexQuota: boolean;
@@ -62,7 +62,7 @@ export const DEFAULT_STATUS_MODULES: Readonly<StatusModulesConfig> = Object.free
   context: true,
 });
 
-export const DEFAULT_CONFIG: Readonly<TokyoConfig> = Object.freeze({
+export const DEFAULT_CONFIG: Readonly<RapConfig> = Object.freeze({
   panel: true,
   editorFrame: true,
   codexQuota: false,
@@ -85,7 +85,7 @@ export interface SettingOption {
 }
 
 export interface SettingDescriptor {
-  id: keyof TokyoConfig;
+  id: keyof RapConfig;
   label: string;
   description: string;
   kind: SettingKind;
@@ -171,7 +171,7 @@ export const SETTINGS: SettingDescriptor[] = [
   },
 ];
 
-function freezeConfig(config: TokyoConfig): Readonly<TokyoConfig> {
+function freezeConfig(config: RapConfig): Readonly<RapConfig> {
   return Object.freeze(config);
 }
 
@@ -242,7 +242,7 @@ function readStatusModules(value: unknown): Readonly<StatusModulesConfig> {
   });
 }
 
-function isValidSettingValue(key: keyof TokyoConfig, value: unknown): boolean {
+function isValidSettingValue(key: keyof RapConfig, value: unknown): boolean {
   const setting = SETTINGS.find((candidate) => candidate.id === key);
   if (!setting) return false;
 
@@ -259,16 +259,16 @@ function isValidSettingValue(key: keyof TokyoConfig, value: unknown): boolean {
   );
 }
 
-function validatedValue<K extends keyof TokyoConfig>(
+function validatedValue<K extends keyof RapConfig>(
   key: K,
   value: unknown,
-): TokyoConfig[K] {
+): RapConfig[K] {
   return isValidSettingValue(key, value)
-    ? (value as TokyoConfig[K])
+    ? (value as RapConfig[K])
     : DEFAULT_CONFIG[key];
 }
 
-function buildConfig(saved: Record<string, unknown>): Readonly<TokyoConfig> {
+function buildConfig(saved: Record<string, unknown>): Readonly<RapConfig> {
   const nextConfig = { ...DEFAULT_CONFIG };
   nextConfig.panel = validatedValue("panel", saved.panel);
   nextConfig.editorFrame = validatedValue("editorFrame", saved.editorFrame);
@@ -286,22 +286,22 @@ function buildConfig(saved: Record<string, unknown>): Readonly<TokyoConfig> {
 }
 
 /**
- * Manages Tokyo Night user configuration in an extension-owned file.
+ * Manages Rap Bluemon user configuration in an extension-owned file.
  */
-export class TokyoConfigManager {
-  private config: Readonly<TokyoConfig> = freezeConfig({ ...DEFAULT_CONFIG });
+export class RapConfigManager {
+  private config: Readonly<RapConfig> = freezeConfig({ ...DEFAULT_CONFIG });
   private writeTail: Promise<void> = Promise.resolve();
 
   /** Get the immutable config snapshot. Callers may read properties directly. */
-  get(): Readonly<TokyoConfig> {
+  get(): Readonly<RapConfig> {
     return this.config;
   }
 
   /** Set a config value by key. TypeScript's indexed access types cannot
-   *  narrow `TokyoConfig[keyof TokyoConfig]` for assignment based on
+   *  narrow `RapConfig[keyof RapConfig]` for assignment based on
    *  runtime guards (setting.kind). This method centralizes the necessary
    *  type escape, keeping external callers type-safe. */
-  set(key: keyof TokyoConfig, value: TokyoConfig[keyof TokyoConfig]): void {
+  set(key: keyof RapConfig, value: RapConfig[keyof RapConfig]): void {
     if (!Object.hasOwn(DEFAULT_CONFIG, key)) return;
 
     // Invalid runtime values are reset rather than allowed into the live config.
@@ -330,10 +330,10 @@ export class TokyoConfigManager {
   async read(errorSink: ExtensionErrorSink = handleExtensionError): Promise<void> {
     await this.writeTail;
     try {
-      const content = fs.readFileSync(getTokyoConfigPath(), "utf-8");
+      const content = fs.readFileSync(getRapConfigPath(), "utf-8");
       const saved: unknown = JSON.parse(content);
       if (!isRecord(saved)) {
-        throw new Error(`${TOKYO_CONFIG_FILE} must contain an object`);
+        throw new Error(`${RAP_CONFIG_FILE} must contain an object`);
       }
       this.config = buildConfig(saved);
     } catch (err) {
@@ -341,7 +341,7 @@ export class TokyoConfigManager {
         await this.readLegacyAndMigrate(errorSink);
         return;
       }
-      errorSink(err, "readTokyoConfig");
+      errorSink(err, "readRapConfig");
       this.config = freezeConfig({ ...DEFAULT_CONFIG });
     }
   }
@@ -355,7 +355,7 @@ export class TokyoConfigManager {
         throw new Error("settings.json must contain an object");
       }
 
-      const saved = settings["pi-tokyo-night"];
+      const saved = settings["rap-bluemon"];
       if (!isRecord(saved)) {
         this.config = freezeConfig({ ...DEFAULT_CONFIG });
         return;
@@ -363,11 +363,11 @@ export class TokyoConfigManager {
 
       this.config = buildConfig(saved);
       if (
-        !await this.writeWithErrorContext("migrateLegacyTokyoConfig", errorSink)
+        !await this.writeWithErrorContext("migrateLegacyRapConfig", errorSink)
       ) return;
     } catch (err) {
       if (!isMissingFileError(err)) {
-        errorSink(err, "migrateLegacyTokyoConfig");
+        errorSink(err, "migrateLegacyRapConfig");
       }
       this.config = freezeConfig({ ...DEFAULT_CONFIG });
     }
@@ -375,7 +375,7 @@ export class TokyoConfigManager {
 
   /** Persist current config to the extension-owned config file. */
   write(errorSink: ExtensionErrorSink = handleExtensionError): Promise<boolean> {
-    return this.writeWithErrorContext("writeTokyoConfig", errorSink);
+    return this.writeWithErrorContext("writeRapConfig", errorSink);
   }
 
   private writeWithErrorContext(
@@ -385,7 +385,7 @@ export class TokyoConfigManager {
     const snapshot = this.config;
     let configPath: string;
     try {
-      configPath = getTokyoConfigPath();
+      configPath = getRapConfigPath();
     } catch (error) {
       errorSink(error, errorContext);
       return Promise.resolve(false);
@@ -398,7 +398,7 @@ export class TokyoConfigManager {
   }
 
   private async persistSnapshot(
-    snapshot: Readonly<TokyoConfig>,
+    snapshot: Readonly<RapConfig>,
     configPath: string,
     errorContext: string,
     errorSink: ExtensionErrorSink,

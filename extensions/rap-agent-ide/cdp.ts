@@ -1,8 +1,8 @@
 /**
  * Minimal Chrome DevTools Protocol (CDP) client for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` debugging/observability. Node's
- * `--inspect-brk` exposes a CDP WebSocket endpoint; this client connects,
+ * Node's `--inspect-brk` exposes a CDP WebSocket endpoint; this client
+ * connects,
  * sends commands (awaiting the matching response by id), and dispatches
  * events. Uses the global `WebSocket` (available in Node 24).
  *

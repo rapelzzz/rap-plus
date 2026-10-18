@@ -3,7 +3,7 @@
  *
  * Parses unified `git diff` output into changed files + new-file line ranges,
  * and parses the common `--staged / --ref=<branch> / files` option form used by
- * both `/simplify` and `/review`. Pure (no Pi imports) → unit-testable.
+ * both `/rap-simplify` and `/rap-review`. Pure (no Pi imports) → unit-testable.
  */
 
 export interface Hunk {

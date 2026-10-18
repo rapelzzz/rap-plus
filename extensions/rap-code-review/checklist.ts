@@ -1,9 +1,8 @@
 /**
  * Language-aware review checklists for rap-code-review.
  *
- * Behavioral target: `pi-code-review` (MattDevy, MIT) — after each turn where
- * the agent edits files, a language-aware review checklist is injected. Pure
- * (no Pi imports) → unit-testable.
+ * After each turn where the agent edits files, a language-aware review
+ * checklist is injected. Pure (no Pi imports) → unit-testable.
  */
 
 export type Language = "typescript" | "javascript" | "python" | "go" | "rust" | "java" | "php";

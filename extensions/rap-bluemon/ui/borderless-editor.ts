@@ -4,7 +4,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
-import type { TokyoConfigManager } from "../core/config.ts";
+import type { RapConfigManager } from "../core/config.ts";
 import { handleExtensionError } from "../core/errors.ts";
 import { isFullscreenTui, requestHostRender } from "../core/pi-compat.ts";
 import {
@@ -13,13 +13,13 @@ import {
   getMainSurfaceFrameRole,
   renderFrameSegment,
 } from "../../todo/ui/frame-layout.ts";
-import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette.ts";
+import type { RapThemePalette } from "../../todo/ui/theme-palette.ts";
 
 const FULLSCREEN_EDITOR_MIN_ROWS = 3;
 
 export interface BorderlessEditorDependencies {
-  config: TokyoConfigManager;
-  getPalette?: () => TokyoNightThemePalette | undefined;
+  config: RapConfigManager;
+  getPalette?: () => RapThemePalette | undefined;
   renderFullscreenStatus?: (width: number) => string[];
 }
 
@@ -88,7 +88,7 @@ export class BorderlessEditor extends CustomEditor {
   }
 
   /**
-   * Pi fullscreen reserves a minimum-height editor dock. Compose Tokyo status
+   * Pi fullscreen reserves a minimum-height editor dock. Compose Rap status
    * into the same component so the host cannot pad between editor content and
    * the below-editor status widget.
    */

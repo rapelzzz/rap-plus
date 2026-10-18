@@ -1,8 +1,8 @@
 /**
  * Code search (ripgrep wrapper) for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` "search" surface. Runs `rg` via the shared
- * argument-array subprocess (no shell), parses `rg -n` line output into hits.
+ * Runs `rg` via the shared argument-array subprocess (no shell), parses
+ * `rg -n` line output into hits.
  * Pure parsing → unit-testable.
  */
 

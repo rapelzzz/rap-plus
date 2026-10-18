@@ -1,8 +1,7 @@
 /**
  * Evidence-first debugging workflow state machine for rap-debug-mode.
  *
- * Behavioral target: `pi-debug-mode` (liush2yuxjtu) — enforce a disciplined,
- * evidence-first debugging methodology:
+ * Enforces a disciplined, evidence-first debugging methodology:
  *   1. investigate  — gather runtime evidence (logs, errors, stack traces).
  *   2. hypothesize  — form falsifiable hypotheses from evidence.
  *   3. probe        — run targeted probes (logs, repro steps, asserts).

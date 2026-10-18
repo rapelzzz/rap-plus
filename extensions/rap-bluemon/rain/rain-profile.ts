@@ -1,4 +1,4 @@
-import type { TokyoConfig } from "../core/config.ts";
+import type { RapConfig } from "../core/config.ts";
 
 export type RainActivity = "idle" | "active" | "tools";
 
@@ -16,7 +16,7 @@ const AUTO_PROFILES: Readonly<Record<RainActivity, RainRuntimeProfile>> = Object
 });
 
 export function resolveRainRuntimeProfile(
-  config: Readonly<TokyoConfig>,
+  config: Readonly<RapConfig>,
   activity: RainActivity,
 ): RainRuntimeProfile {
   if (config.rainMode === "static") return { tickMs: 0, maxDrops: 0 };

@@ -12,52 +12,51 @@ That installs Pi (if missing) and registers the `rap-plus` package. Start Pi and
 
 ## What's inside
 
-| Extension | Path | Description | Parity |
-|---|---|---|---|
-| rap-bluemon | `extensions/rap-bluemon` | Neon studio UI: status bar, rain panel, usage analytics, trend chart | original |
-| todo | `extensions/todo` | RAP Todo panel, `/rap-todo` commands, `rap_todo` tool, per-project persistence | original |
-| rap-web-search | `extensions/rap-web-search.ts` | Headless Playwright + DuckDuckGo `web_search` tool | original |
-| rap-plan-mode | `extensions/rap-plan-mode` | Read-only planning mode; blocks writes/destructive bash | ✓ full |
-| rap-subagents | `extensions/rap-subagents` | Delegation: single/parallel/chain; depth limit; cancellation | ✓ full |
-| rap-simplify | `extensions/rap-simplify` | Review & simplify git-diff changed code; regression-safe | ✓ full |
-| rap-code-review | `extensions/rap-code-review` | Auto-review checklist + `/review` with severity findings | ✓ full |
-| rap-lens | `extensions/rap-lens` | Diagnostics + LSP nav, symbol search, ast-grep, autofix, `/lens-map` | ✓ full |
-| rap-debug-mode | `extensions/rap-debug-mode` | Evidence-first debug workflow; repro-gated fixes | ✓ full |
-| rap-agent-ide | `extensions/rap-agent-ide` | Guarded editing, search, diff, terminals, CDP debugging, observability | ✓ full |
-| theme | `themes/rap-bluemon.json` | Dark "bluemon" theme | — |
-
-Parity column: **✓ full** = behaviorally matches the reference extension; **◐ partial** = focused subset shipped (see [research/feature-parity.md](research/feature-parity.md)); **original** = not derived from a reference.
+| Extension | Path | Description |
+|---|---|---|
+| rap-bluemon | `extensions/rap-bluemon` | Neon studio UI: status bar, rain panel, usage analytics, trend chart |
+| todo | `extensions/todo` | RAP Todo panel, `/rap-todo` commands, `rap_todo` tool, per-project persistence |
+| rap-web-search | `extensions/rap-web-search.ts` | Headless Playwright + DuckDuckGo `web_search` tool |
+| rap-plan-mode | `extensions/rap-plan-mode` | Read-only planning mode; blocks writes/destructive bash |
+| rap-subagents | `extensions/rap-subagents` | Delegation: single/parallel/chain; depth limit; cancellation |
+| rap-simplify | `extensions/rap-simplify` | Review & simplify git-diff changed code; regression-safe |
+| rap-code-review | `extensions/rap-code-review` | Auto-review checklist + `/rap-review` with severity findings |
+| rap-lens | `extensions/rap-lens` | Diagnostics + LSP nav, symbol search, ast-grep, autofix, `/rap-lens-map` |
+| rap-debug-mode | `extensions/rap-debug-mode` | Evidence-first debug workflow; repro-gated fixes |
+| rap-agent-ide | `extensions/rap-agent-ide` | Guarded editing, search, diff, terminals, CDP debugging, observability |
+| theme | `themes/rap-bluemon.json` | Dark "bluemon" theme |
 
 ## Commands & tools
 
-### rap-plan-mode (`/plan`)
-Toggleable read-only planning mode. When active, edit/write tools are removed from the active set and destructive bash commands are blocked via the `tool_call` event. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` + the `--plan` flag. Faithful adaptation of Pi's bundled `examples/extensions/plan-mode`.
+### rap-plan-mode (`/rap-plan`, `/rap-todos`)
+Toggleable read-only planning mode. When active, edit/write tools are removed from the active set and destructive bash commands are blocked via the `tool_call` event. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` + the `--plan` flag.
 
-### rap-subagents (`/subagent`, `/subagents`)
-Delegate tasks to other Pi agents. Modes: single, parallel (max 8 tasks / 4 concurrent), and chain (max depth 3). Agent discovery from `~/.pi/agent/agents` and nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`. Adapted from Pi's bundled `examples/extensions/subagent`.
+### rap-subagents (`subagent` tool)
+Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`.
 
-### rap-simplify (`/simplify`)
+### rap-simplify (`/rap-simplify`)
 Detects files changed via `git diff`, constructs a scoped simplification review instruction, and sends it to the session agent via `pi.sendUserMessage`. Shared git-diff parsing in `extensions/_shared/git-diff.ts`.
 
-### rap-code-review (`/review`)
+### rap-code-review (`/rap-review`)
 Two surfaces:
 1. **Automatic**: after each turn where the agent edits files, a language-aware review checklist (TypeScript/Python/Go/Rust/Java/PHP/JS) is injected into the next turn via `before_agent_start`.
-2. **On-demand `/review`**: computes changed files + line ranges via `git diff`, reads the changed code, and calls the session model (`ctx.modelRegistry.complete`) for structured, severity-tagged findings (CRITICAL/HIGH/MEDIUM/INFO), parsed from JSON. Falls back to a prompt-based review when no model is configured. Read-only.
+2. **On-demand `/rap-review`**: computes changed files + line ranges via `git diff`, reads the changed code, and calls the session model (`ctx.modelRegistry.complete`) for structured, severity-tagged findings (CRITICAL/HIGH/MEDIUM/INFO), parsed from JSON. Falls back to a prompt-based review when no model is configured. Read-only.
 
-### rap-lens (`/lens`, `/lens-map`)
-Full diagnostics + code-intelligence suite. Dynamic tool/dependency detection, TypeScript type-check (`tsc --noEmit`), compiler/linter output parsing (tsc, rustc/gcc, ruff/flake8), and a triage tool (`lens_diagnostic_mark`: falsePositive/suppressed/deferred/flagFix). LSP navigation via the TypeScript LanguageService: `lens_goto_definition`, `lens_find_references`, `lens_hover`. Symbol discovery: `lens_symbol_search`, `lens_module_report`, `lens_read_symbol` (regex fallback). Structural search/replace via ast-grep: `lens_ast_grep` (RO) + `lens_ast_grep_replace` (mutating; rejects the system `sg`/newgrp). Autofix: `lens_autofix` (TS codefixes + `eslint --fix` + `prettier --write`, dynamic). `/lens-map` writes a self-contained HTML module map. **Gaps**: event-driven diagnostics-on-edit and impact cascade are not implemented.
+### rap-lens (`/rap-lens`, `/rap-lens-map`)
+Full diagnostics + code-intelligence suite. Dynamic tool/dependency detection, TypeScript type-check (`tsc --noEmit`), compiler/linter output parsing (tsc, rustc/gcc, ruff/flake8), and a triage tool (`lens_diagnostic_mark`: falsePositive/suppressed/deferred/flagFix). LSP navigation via the TypeScript LanguageService: `lens_goto_definition`, `lens_find_references`, `lens_hover`. Symbol discovery: `lens_symbol_search`, `lens_module_report`, `lens_read_symbol` (regex fallback). Structural search/replace via ast-grep: `lens_ast_grep` (RO) + `lens_ast_grep_replace` (mutating; rejects the system `sg`/newgrp). Autofix: `lens_autofix` (TS codefixes + `eslint --fix` + `prettier --write`, dynamic). `/rap-lens-map` writes a self-contained HTML module map. **Gaps**: event-driven diagnostics-on-edit and impact cascade are not implemented.
 
-### rap-debug-mode (`/debug`, `debug_checkpoint`)
+### rap-debug-mode (`/rap-debug`, `debug_checkpoint`)
 Evidence-first debugging methodology. When enabled, injects a six-stage workflow (investigate → hypothesize → probe → reproduce → fix → verify). The `debug_checkpoint` tool records progress and **gates the fix stage behind a confirmed reproduction** (safety invariant: no fixing before repro). Includes the smallest-fix and verify-with-repro disciplines.
 
 ### rap-agent-ide (`ide_search`, `ide_diff`, `ide_edit_guarded`, `ide_terminal`, `ide_debug_run`, `ide_debug`, `ide_system_metrics`, `ide_cpu_profile`)
-Guarded IDE assistance. Guarded editing (path safety + sensitive-path block + size cap + interactive confirm), ripgrep code search, and git diff inspection. **Terminal pool**: `ide_terminal` (create/send/list/output/kill persistent shell sessions). **Debugging**: `ide_debug_run` starts a script under `node --inspect-brk`; `ide_debug` controls it (breakpoint/removeBreakpoint/resume/stepOver/stepInto/stepOut/evaluate/locals/status/stop) over CDP. **Observability**: `ide_system_metrics` (host/cpu/memory via `node:os`) and `ide_cpu_profile` (captures a `.cpuprofile` via the CDP Profiler domain). **Gaps**: event-driven LSP-on-edit (use rap-lens), undo/recovery stack.
-Guarded IDE-style assistance:
-- `ide_search` — ripgrep code search (read-only).
-- `ide_diff` — git diff for a path (read-only).
-- `ide_edit_guarded` — write/edit with safety validation: path must resolve within the project root, sensitive paths (`.env`, credentials, SSH keys, `.npmrc`) are blocked, size limits enforced, and the user is asked to confirm before applying.
+Guarded IDE assistance:
+- **Guarded editing** — `ide_edit_guarded`: write/edit with safety validation (path must resolve within the project root, sensitive paths like `.env`/credentials/SSH keys/`.npmrc` are blocked, size limits enforced, interactive confirm).
+- **Search & diff** — `ide_search` (ripgrep, read-only), `ide_diff` (git diff per path, read-only).
+- **Terminal pool** — `ide_terminal`: create/send/list/output/kill persistent shell sessions.
+- **Debugging** — `ide_debug_run` starts a script under `node --inspect-brk`; `ide_debug` controls it (breakpoint/removeBreakpoint/resume/stepOver/stepInto/stepOut/evaluate/locals/status/stop) over CDP.
+- **Observability** — `ide_system_metrics` (host/cpu/memory via `node:os`), `ide_cpu_profile` (captures a `.cpuprofile` via the CDP Profiler domain).
 
-**Not implemented**: undo/recovery stack, event-driven LSP-on-edit (use rap-lens `/lens`).
+**Gaps**: undo/recovery stack, event-driven LSP-on-edit (use rap-lens `/rap-lens`).
 
 ## Safety invariants
 
@@ -82,12 +81,6 @@ Test coverage:
 - rap-lens: 40 · rap-debug-mode: 11 · rap-agent-ide: 31 · todo: 7
 
 Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
-
-## Research & parity
-
-- [research/extension-matrix.md](research/extension-matrix.md) — verified/unverified status of all 7 reference extensions.
-- [research/feature-parity.md](research/feature-parity.md) — per-feature comparison (✓/~/✗) with notes.
-- [research/evidence-log.md](research/evidence-log.md) — auditable trail of what was verified, how, and when.
 
 ## Manual install
 

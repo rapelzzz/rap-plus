@@ -1,7 +1,7 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
-  DEFAULT_TOKYO_NIGHT_PALETTE,
-  type TokyoNightThemePalette,
+  DEFAULT_RAP_PALETTE,
+  type RapThemePalette,
 } from "./theme-palette.ts";
 import { BOX } from "./ui-primitives.ts";
 
@@ -12,7 +12,7 @@ export interface FrameSegmentOptions {
   lines: readonly string[];
   frameEnabled: boolean;
   role: FrameSegmentRole;
-  palette?: TokyoNightThemePalette;
+  palette?: RapThemePalette;
   padUnframed?: boolean;
 }
 
@@ -20,7 +20,7 @@ export interface FrameDockOptions {
   width: number;
   lines: readonly string[];
   frameEnabled: boolean;
-  palette?: TokyoNightThemePalette;
+  palette?: RapThemePalette;
   renderBottom?: () => readonly string[];
   recoverLines?: () => readonly string[];
   onBottomError?: (error: unknown) => void;
@@ -56,7 +56,7 @@ function hasBottomEdge(role: FrameSegmentRole): boolean {
 
 function frameColor(
   value: string,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string {
   return value.length > 0 ? palette.fg("frame", value) : "";
 }
@@ -64,7 +64,7 @@ function frameColor(
 function renderEdge(
   width: number,
   edge: "top" | "bottom",
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string {
   if (width === 0) return "";
   if (width === 1) return frameColor(edge === "top" ? BOX.tl : BOX.bl, palette);
@@ -81,7 +81,7 @@ function fitLine(line: string, width: number, pad: boolean): string {
 }
 
 /**
- * Render one vertical segment of the shared Tokyo Night frame. Adjacent
+ * Render one vertical segment of the shared Rap Bluemon frame. Adjacent
  * surfaces own complementary edges so the complete dock has one top and one
  * bottom border regardless of which main surface is active.
  */
@@ -93,7 +93,7 @@ export function renderFrameSegment(options: FrameSegmentOptions): string[] {
     );
   }
 
-  const palette = options.palette ?? DEFAULT_TOKYO_NIGHT_PALETTE;
+  const palette = options.palette ?? DEFAULT_RAP_PALETTE;
   const contentWidth = getFrameContentWidth(outputWidth, true);
   const body = options.lines.map((line) => {
     const content = fitLine(line, contentWidth, true);

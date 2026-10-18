@@ -1,8 +1,8 @@
 /**
  * Debugging for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` debugging. Drives a Node target under
- * `--inspect-brk` via the CDP client: start (paused at entry), set/remove
+ * Drives a Node target under `--inspect-brk` via the CDP client: start
+ * (paused at entry), set/remove
  * breakpoints, resume & step, evaluate expressions in the paused frame, and
  * report the paused call stack + local variables.
  *

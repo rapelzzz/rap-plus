@@ -1,9 +1,9 @@
 /**
  * Diagnostic triage store for rap-lens.
  *
- * Behavioral target: `pi-lens` `lens_diagnostic_mark` — findings can be marked
- * false-positive, suppressed, deferred, or flagged-to-fix, and honored across
- * surfaces. Pure (no Pi imports) → unit-testable.
+ * Findings can be marked false-positive, suppressed, deferred, or
+ * flagged-to-fix, and honored across surfaces. Pure (no Pi imports) →
+ * unit-testable.
  */
 
 export type TriageMark = "falsePositive" | "suppressed" | "deferred" | "flagFix";

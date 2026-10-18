@@ -1,18 +1,18 @@
 /**
  * rap-lens — code diagnostics, LSP navigation, structural search & autofix.
  *
- * Behavioral target: `pi-lens` (apmantza). Full surface implemented:
+ * Ships the full surface:
  *   - TypeScript type-checking (`tsc --noEmit`) + multi-compiler/linter parsing
  *   - Triage tool (`lens_diagnostic_mark`)
  *   - LSP navigation: goto-definition, find-references, hover
  *   - Symbol discovery: symbol_search, module_report, read_symbol
  *   - Structural search/replace via ast-grep (`lens_ast_grep`)
  *   - Autofix: TS codefixes + eslint --fix + prettier --write
- *   - `/lens-map` HTML module-map generator
+ *   - `/rap-lens-map` HTML module-map generator
  *
  * Commands/tools:
- *   /lens             — run available diagnostics (tsc) and report.
- *   /lens-map         — generate an HTML module map of the project.
+ *   /rap-lens          — run available diagnostics (tsc) and report.
+ *   /rap-lens-map      — generate an HTML module map of the project.
  *   lens_diagnostic_mark        (tool) — triage a finding.
  *   lens_goto_definition        (tool, RO) — LSP goto definition.
  *   lens_find_references        (tool, RO) — LSP find references.
@@ -62,7 +62,7 @@ export default function rapLens(pi: ExtensionAPI): void {
 		return sgCache.bin;
 	}
 
-	pi.registerCommand("lens", {
+	pi.registerCommand("rap-lens", {
 		description: "Run available code diagnostics (TypeScript type-check) and report findings.",
 		handler: async (_args, ctx) => {
 			const tools = detectTools(ctx.cwd);
@@ -86,7 +86,7 @@ export default function rapLens(pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.registerCommand("lens-map", {
+	pi.registerCommand("rap-lens-map", {
 		description: "Generate a self-contained HTML module map of the project (writes lens-map.html).",
 		handler: async (args, ctx) => {
 			const outFile = args.trim() || "lens-map.html";

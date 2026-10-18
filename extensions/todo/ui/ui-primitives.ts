@@ -1,5 +1,5 @@
 // ANSI resets and RGB encoders are kept below the ThemePalette boundary:
-// dynamic accents can use the active Theme while Tokyo Night chrome can keep
+// dynamic accents can use the active Theme while Rap Bluemon chrome can keep
 // its stable original RGB palette.
 export const RESET_BG = "\x1b[49m";
 export const RESET_FG = "\x1b[39m";

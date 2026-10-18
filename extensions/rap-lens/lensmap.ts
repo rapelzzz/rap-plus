@@ -1,10 +1,10 @@
 /**
  * /lens-map HTML module-map generator for rap-lens.
  *
- * Behavioral target: `pi-lens` /lens-map. Produces a self-contained HTML
- * page that outlines every script file in the project with its top-level
- * symbols (classes, functions, interfaces, types, consts). Uses the
- * TypeScript LanguageService outline when available, else a regex scan.
+ * Produces a self-contained HTML page that outlines every script file in
+ * the project with its top-level symbols (classes, functions, interfaces,
+ * types, consts). Uses the TypeScript LanguageService outline when
+ * available, else a regex scan.
  *
  * The HTML renderer is a pure function over collected data → unit-tested.
  */

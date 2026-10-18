@@ -1,7 +1,7 @@
 /**
  * ast-grep structural search/replace wrapper for rap-lens.
  *
- * Behavioral target: `pi-lens` ast-grep integration. Detects the ast-grep
+ * Detects the ast-grep
  * binary dynamically (local node_modules, then PATH), with a guard that
  * rejects the system `sg` (newgrp) command which is NOT ast-grep. Runs
  * structural search (`--json=compact`) and in-place rewrite (`--update-all`).

@@ -1,16 +1,13 @@
 /**
  * rap-subagents — delegate tasks to specialized agents with isolated context.
  *
- * Behavioral parity target: `pi-subagents` (geminixiang, npm) + Pi's own bundled
- * example `examples/extensions/subagent` (canonical complete reference).
- *
  * Spawns a separate `pi --mode json -p --no-session` process per subagent for
  * an isolated context window. Three modes:
  *   - Single:   { agent, task }
  *   - Parallel: { tasks: [{agent, task}, ...] }  (max 8, concurrency 4)
  *   - Chain:    { chain: [{agent, task, ...{previous}...}, ...] }
  *
- * Safety additions beyond the reference:
+ * Safety:
  *   - MAX_CHAIN_DEPTH (env RAP_SUBAGENT_DEPTH) bounds recursive delegation
  *     across process boundaries so a subagent cannot spawn subagents forever.
  *   - stderr is redacted of credential patterns before surfacing.

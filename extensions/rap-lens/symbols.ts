@@ -1,8 +1,8 @@
 /**
  * Symbol discovery for rap-lens.
  *
- * Behavioral target: `pi-lens` symbol_search / module_report / read_symbol,
- * backed by the TypeScript LanguageService navigate APIs. Falls back to a
+ * Backed by the TypeScript LanguageService navigate APIs (symbol_search /
+ * module_report / read_symbol). Falls back to a
  * regex scan when a project has no TypeScript LanguageService available.
  */
 

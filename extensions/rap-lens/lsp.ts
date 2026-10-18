@@ -1,7 +1,7 @@
 /**
  * TypeScript LanguageService wrapper for rap-lens navigation.
  *
- * Behavioral target: `pi-lens` LSP navigation — goto-definition and
+ * goto-definition and
  * find-references, powered by the `typescript` package's LanguageService
  * (the same engine tsserver uses). Works for .ts/.tsx/.js/.jsx.
  *

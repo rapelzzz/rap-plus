@@ -1,7 +1,7 @@
 /**
  * Observability for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` observability. Two surfaces:
+ * Two surfaces:
  *   1. System metrics — host/cpu/memory via `node:os` + `process`.
  *   2. CPU profile — capture a `.cpuprofile` (Chrome DevTools format) by
  *      driving a Node target under `--inspect` with the CDP `Profiler` domain,

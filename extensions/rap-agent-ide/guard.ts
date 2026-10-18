@@ -1,8 +1,8 @@
 /**
  * Guarded-edit policy for rap-agent-ide.
  *
- * Behavioral target: `pi-agent-ide` (alexshpunt, MIT) "guarded editing" — edits
- * are validated against a safety policy before being applied: path must resolve
+ * "Guarded editing" — edits are validated against a safety policy before
+ * being applied: path must resolve
  * within the project root, sensitive paths are blocked, size limits enforced,
  * and destructive content (emptying/overwriting large files) is flagged.
  *

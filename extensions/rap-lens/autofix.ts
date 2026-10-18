@@ -1,7 +1,7 @@
 /**
  * Autofix for rap-lens.
  *
- * Behavioral target: `pi-lens` autofix. Combines three repair strategies,
+ * Combines three repair strategies,
  * each with dynamic dependency detection so the tool degrades gracefully:
  *
  *   1. TypeScript codefixes — apply the LanguageService's suggested fixes

@@ -1,4 +1,4 @@
-/** Tokyo Night Extension composition root. */
+/** Rap Bluemon Extension composition root. */
 
 import { getAgentDir, VERSION, type ExtensionAPI, type ExtensionCommandContext, type ExtensionContext, type ExtensionUIContext, type KeybindingsManager, type ReadonlyFooterDataProvider, type Theme } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
@@ -7,10 +7,10 @@ import path from "node:path";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { Text } from "@earendil-works/pi-tui";
 import { readUsageHistory } from "./analytics/usage-history.ts";
-import { TokyoConfigManager } from "./core/config.ts";
+import { RapConfigManager } from "./core/config.ts";
 import { detectTerminalTheme } from "./core/terminal-theme.ts";
 import {
-  createTokyoNightErrorSink,
+  createRapErrorSink,
   flushConsoleLogWrites,
   installConsoleLogBridge,
   type ConsoleLogBridge,
@@ -55,8 +55,8 @@ import {
   renderFrameSegment,
 } from "../todo/ui/frame-layout.ts";
 import {
-  createTokyoNightPalette,
-  type TokyoNightThemePalette,
+  createRapPalette,
+  type RapThemePalette,
 } from "../todo/ui/theme-palette.ts";
 import { renderWorkingText } from "./ui/working-shimmer.ts";
 import {
@@ -70,7 +70,7 @@ import {
   type KimiUsageStore,
 } from "./usage/index.ts";
 
-export type TokyoNightMode = "tui" | "rpc" | "json" | "print";
+export type RapBluemonMode = "tui" | "rpc" | "json" | "print";
 
 type BranchState = {
   cachedBranch: string;
@@ -110,7 +110,7 @@ type SessionUIResources = {
 type SessionState = {
   generation: number;
   ui: ExtensionUIContext;
-  mode: TokyoNightMode;
+  mode: RapBluemonMode;
   hasUI: boolean;
   cwd: string;
   identityKey: string;
@@ -141,13 +141,13 @@ type SessionState = {
 const WORKING_ANIMATION_INTERVAL_MS = 100;
 const WORKING_INDICATOR_INTERVAL_MS = 80;
 const MIN_OUTPUT_TPS_INTERVAL_MS = 100;
-const TOKYO_WORKING_GLYPHS = Object.freeze([
+const RAP_WORKING_GLYPHS = Object.freeze([
   "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
 ] as const);
 
-function renderTokyoWorkingFrame(theme: Theme | undefined, elapsedMs: number): string {
-  const palette = theme ? createTokyoNightPalette(theme) : undefined;
-  const glyph = TOKYO_WORKING_GLYPHS[Math.floor(elapsedMs / WORKING_INDICATOR_INTERVAL_MS) % TOKYO_WORKING_GLYPHS.length];
+function renderRapWorkingFrame(theme: Theme | undefined, elapsedMs: number): string {
+  const palette = theme ? createRapPalette(theme) : undefined;
+  const glyph = RAP_WORKING_GLYPHS[Math.floor(elapsedMs / WORKING_INDICATOR_INTERVAL_MS) % RAP_WORKING_GLYPHS.length];
   return palette?.fg("workingText", glyph) ?? glyph;
 }
 
@@ -160,7 +160,7 @@ const KIMI_POLL_INTERVAL_MS = 60_000;
 const KIMI_RETRY_DELAYS_MS = [60_000, 120_000, 300_000, 900_000] as const;
 const KIMI_SNAPSHOT_MAX_AGE_MS = 10 * 60_000;
 
-export const TOKYO_NIGHT_AUTOMATIC_THEME_SETTING =
+export const RAP_BLUEMON_AUTOMATIC_THEME_SETTING =
   "rap-bluemon";
 
 export interface PiThemeSettingResult {
@@ -276,7 +276,7 @@ export function writePiThemeSetting(
   }
 }
 
-export function shouldRunRainAnimation(mode: TokyoNightMode, panelEnabled: boolean): boolean {
+export function shouldRunRainAnimation(mode: RapBluemonMode, panelEnabled: boolean): boolean {
   return mode === "tui" && panelEnabled;
 }
 
@@ -293,7 +293,7 @@ export function buildStatusWidgetLines(
   width: number,
   statusContent: string | string[],
   frameEnabled = true,
-  palette?: TokyoNightThemePalette,
+  palette?: RapThemePalette,
 ): string[] {
   return renderFrameSegment({
     width: safeTerminalWidth(width),
@@ -305,7 +305,7 @@ export function buildStatusWidgetLines(
   });
 }
 
-export function registerTokyoNightExtension(
+export function registerRapBluemonExtension(
   pi: ExtensionAPI,
   dependencies: {
     installConsoleLogBridge?: typeof installConsoleLogBridge;
@@ -315,13 +315,13 @@ export function registerTokyoNightExtension(
     compatibility?: PiCompatibility;
   } = {},
 ): void {
-  const configManager = new TokyoConfigManager();
+  const configManager = new RapConfigManager();
   const codexUsageStore = createCodexUsageStore();
   const installBridge = dependencies.installConsoleLogBridge ?? installConsoleLogBridge;
   let consoleLogBridge: ConsoleLogBridge | undefined;
   let consoleBridgeOwnerIdentity: string | undefined;
   let consoleBridgeOwnerRevision = 0;
-  const errorSink = dependencies.errorSink ?? createTokyoNightErrorSink();
+  const errorSink = dependencies.errorSink ?? createRapErrorSink();
   const sessionsByIdentity = new Map<string, SessionState>();
   let activeSession: SessionState | null = null;
   let activeNeonStudio: {
@@ -345,16 +345,6 @@ export function registerTokyoNightExtension(
   let kimiFailureLogged = false;
   const loadPiThemeSetting = dependencies.readPiThemeSetting ?? readPiThemeSetting;
   const savePiThemeSetting = dependencies.writePiThemeSetting ?? writePiThemeSetting;
-  // Self-heal: the theme was renamed to "rap-bluemon". If a stale
-  // "tokyo-night-blue" is still persisted in Pi's settings, rewrite it so a
-  // /reload doesn't fail with "Theme not found" and fall back to the system theme.
-  try {
-    if (loadPiThemeSetting() === "tokyo-night-blue") {
-      savePiThemeSetting("rap-bluemon");
-    }
-  } catch {
-    // Best-effort migration must not block extension registration.
-  }
   const compatibility = dependencies.compatibility ?? evaluatePiCompatibility(VERSION);
   let compatibilityWarningShown = false;
 
@@ -542,7 +532,7 @@ export function registerTokyoNightExtension(
   const workingMessage = (session: SessionState): string => {
     const { working } = session;
     const theme = session.ui.theme;
-    const palette = theme ? createTokyoNightPalette(theme) : undefined;
+    const palette = theme ? createRapPalette(theme) : undefined;
     const tool = working.activeTools.values().next().value as WorkingTool | undefined;
     if (tool) {
       const elapsedMs = Date.now() - tool.startedAt;
@@ -588,7 +578,7 @@ export function registerTokyoNightExtension(
     syncWorkingIndicator(session);
     const elapsed = Math.max(0, Date.now() - (session.working.phaseStartedAt ?? Date.now()));
     const message = session.working.indicatorOwned
-      ? `${renderTokyoWorkingFrame(session.ui.theme, elapsed)} ${workingMessage(session)}`
+      ? `${renderRapWorkingFrame(session.ui.theme, elapsed)} ${workingMessage(session)}`
       : workingMessage(session);
     try {
       if (session.working.lastMessage !== message) {
@@ -849,8 +839,8 @@ export function registerTokyoNightExtension(
     }
 
     try {
-      if (canClearUI()) session.ui.setWidget("tokyo-rain", undefined);
-      if (canClearUI()) session.ui.setWidget("tokyo-status", undefined);
+      if (canClearUI()) session.ui.setWidget("rap-rain", undefined);
+      if (canClearUI()) session.ui.setWidget("rap-status", undefined);
     } catch (error) {
       if (!isStaleExtensionContextError(error)) handleExtensionError(error, "widget teardown");
     }
@@ -901,7 +891,7 @@ export function registerTokyoNightExtension(
     const borderlessDependencies: BorderlessEditorDependencies = {
       config: configManager,
       getPalette: () =>
-        session.ui.theme ? createTokyoNightPalette(session.ui.theme) : undefined,
+        session.ui.theme ? createRapPalette(session.ui.theme) : undefined,
     };
     const renderStatusLines = (width: number, theme: Theme): string[] => {
       if (!isCurrent(session)) return [];
@@ -950,7 +940,7 @@ export function registerTokyoNightExtension(
           outputWidth,
           lines,
           config.editorFrame,
-          theme ? createTokyoNightPalette(theme) : undefined,
+          theme ? createRapPalette(theme) : undefined,
         );
       });
     };
@@ -1064,8 +1054,8 @@ export function registerTokyoNightExtension(
     };
 
     session.ui.setEditorComponent(editorFactory);
-    session.ui.setWidget("tokyo-rain", rainFactory, { placement: "aboveEditor" });
-    session.ui.setWidget("tokyo-status", statusFactory, { placement: "belowEditor" });
+    session.ui.setWidget("rap-rain", rainFactory, { placement: "aboveEditor" });
+    session.ui.setWidget("rap-status", statusFactory, { placement: "belowEditor" });
     session.ui.setFooter(footerFactory);
     session.ui.setWorkingVisible(true);
     session.ui.setWorkingMessage();
@@ -1320,7 +1310,7 @@ export function registerTokyoNightExtension(
   });
 
   pi.registerCommand("rap-plus", {
-    description: "Open Neon Studio (Tokyo Night Blue). Usage: /rap-plus [on|off]",
+    description: "Open Neon Studio (Rap Bluemon Blue). Usage: /rap-plus [on|off]",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const arg = args.trim().toLowerCase();
       if (arg === "on" || arg === "off") {
@@ -1334,13 +1324,13 @@ export function registerTokyoNightExtension(
           if (!await configManager.write(errorSink)) {
             if (configManager.get() === snapshot) configManager.set("panel", previousPanel);
             if (ctx.hasUI && (!commandSession || isCurrent(commandSession))) {
-              ctx.ui.notify("Could not save Tokyo Night panel settings.", "error");
+              ctx.ui.notify("Could not save Rap Bluemon panel settings.", "error");
             }
             return;
           }
           if (!isInteractive(ctx) || !commandSession || !isCurrent(commandSession)) return;
           applyPanelState(commandSession);
-          ctx.ui.notify(`Tokyo Night panel ${arg}`, "info");
+          ctx.ui.notify(`Rap Bluemon panel ${arg}`, "info");
         };
         const save = panelSaveTail ? panelSaveTail.then(savePanel, savePanel) : savePanel();
         panelSaveTail = save;
@@ -1371,7 +1361,7 @@ export function registerTokyoNightExtension(
             ? "light"
             : undefined;
       const persistedThemeChoice: NeonStudioThemeChoice | undefined =
-        configuredTheme === TOKYO_NIGHT_AUTOMATIC_THEME_SETTING
+        configuredTheme === RAP_BLUEMON_AUTOMATIC_THEME_SETTING
           ? "automatic"
           : configuredTheme === "rap-bluemon"
             ? "dark"
@@ -1476,16 +1466,16 @@ export function registerTokyoNightExtension(
           const applied = ctx.ui.setTheme(automaticPreviewTheme);
           if (!applied.success) return applied;
         }
-        if (configuredTheme === TOKYO_NIGHT_AUTOMATIC_THEME_SETTING) {
+        if (configuredTheme === RAP_BLUEMON_AUTOMATIC_THEME_SETTING) {
           return { success: true };
         }
         const result = savePiThemeSetting(
-          TOKYO_NIGHT_AUTOMATIC_THEME_SETTING,
+          RAP_BLUEMON_AUTOMATIC_THEME_SETTING,
         );
         if (result.success) {
           try {
             ctx.ui.notify(
-              "Automatic Tokyo Night saved. Restart Pi to keep following terminal theme changes.",
+              "Automatic Rap Bluemon saved. Restart Pi to keep following terminal theme changes.",
               "info",
             );
           } catch (error) {
@@ -1652,4 +1642,4 @@ export function registerTokyoNightExtension(
   // second UI implementation and cannot affect the 0.79+ public API path.
 }
 
-export default registerTokyoNightExtension;
+export default registerRapBluemonExtension;

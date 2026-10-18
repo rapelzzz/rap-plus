@@ -1,14 +1,14 @@
 /**
  * rap-code-review — automated, language-aware code review.
  *
- * Behavioral parity target: `pi-code-review` (MattDevy, MIT).
+ * Two review surfaces:
  *
  * 1) Automatic review (zero-cost): after each turn where the agent edits files,
  *    a language-aware review checklist is injected into the next turn so the
  *    agent self-reviews before proceeding. Edit tracking via the `tool_result`
  *    event (write/edit), batched at `turn_end`, injected at `before_agent_start`.
  *
- * 2) On-demand `/review`: computes changed files+line ranges via `git diff`,
+ * 2) On-demand `/rap-review`: computes changed files+line ranges via `git diff`,
  *    reads the changed code, and calls the session model
  *    (`ctx.modelRegistry.complete`) for structured, severity-tagged findings
  *    (CRITICAL/HIGH/MEDIUM/INFO). Falls back to a prompt-based review via the
@@ -88,7 +88,7 @@ export default function rapCodeReview(pi: ExtensionAPI): void {
 		return { message: { customType: "rap-code-review-checklist", content: checklist, display: false } };
 	});
 
-	pi.registerCommand("review", {
+	pi.registerCommand("rap-review", {
 		description: "Review changed code with severity-tagged findings. Options: --staged, --ref=<branch>, or file paths.",
 		handler: async (args, ctx) => {
 			const argv = args.trim().split(/\s+/).filter(Boolean);

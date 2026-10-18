@@ -18,15 +18,15 @@ import {
 import {
   DEFAULT_STATUS_MODULES,
   type StatusModulesConfig,
-  type TokyoConfigManager,
+  type RapConfigManager,
 } from "../core/config.ts";
 import { handleExtensionError } from "../core/errors.ts";
 import { resolveIcons, type StatusIcons } from "../../todo/ui/icons.ts";
 import {
-  createTokyoNightPalette,
-  type TokyoNightBackgroundRole,
-  type TokyoNightForegroundRole,
-  type TokyoNightThemePalette,
+  createRapPalette,
+  type RapBackgroundRole,
+  type RapForegroundRole,
+  type RapThemePalette,
 } from "../../todo/ui/theme-palette.ts";
 import { RESET_BG } from "../../todo/ui/ui-primitives.ts";
 
@@ -34,8 +34,8 @@ type Module = {
   text: string;
   /** Width budget for grouping only; the displayed text always uses real values. */
   layoutText?: string;
-  bg: TokyoNightBackgroundRole | null;
-  fg: TokyoNightForegroundRole;
+  bg: RapBackgroundRole | null;
+  fg: RapForegroundRole;
   noEndArrow?: boolean;
 };
 
@@ -376,14 +376,14 @@ function getActiveBranchAssistantTokens(ctx: ExtensionContext): number {
   return tokens;
 }
 
-const getModuleBg = (m: Module): TokyoNightBackgroundRole | null => m.bg;
+const getModuleBg = (m: Module): RapBackgroundRole | null => m.bg;
 
 // Powerline transition arrow between two modules (1-char wide)
 const buildTransition = (
   from: Module,
   to: Module,
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string => palette.transition(from.bg, to.bg, icons.transition);
 
 const getModuleText = (m: Module): string => ` ${m.text} `;
@@ -395,7 +395,7 @@ const getModuleLayoutWidth = (m: Module): number => Math.max(
 const formatIconLabel = (icon: string, label: string): string =>
   icon ? `${icon} ${label}` : label;
 
-const buildModule = (m: Module, palette: TokyoNightThemePalette): string => {
+const buildModule = (m: Module, palette: RapThemePalette): string => {
   const text = palette.fg(m.fg, getModuleText(m));
   return m.bg === null ? `${RESET_BG}${text}` : palette.bg(m.bg, text);
 };
@@ -404,7 +404,7 @@ const buildModule = (m: Module, palette: TokyoNightThemePalette): string => {
 const buildSection = (
   modules: Module[],
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ) => {
   let result = "";
   let currentWidth = 0;
@@ -431,7 +431,7 @@ type StatusLayout = {
   requiredWidth: number;
   modules: Module[];
   icons: StatusIcons;
-  palette: TokyoNightThemePalette;
+  palette: RapThemePalette;
 };
 
 const END_MODULE: Module = {
@@ -443,14 +443,14 @@ const END_MODULE: Module = {
 const buildEndArrow = (
   module: Module,
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string =>
   module.noEndArrow ? "" : buildTransition(module, END_MODULE, icons, palette);
 
 function buildRow(
   modules: Module[],
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string {
   if (modules.length === 0) return "";
   return `${buildSection(modules, icons, palette).result}${buildEndArrow(modules[modules.length - 1], icons, palette)}`;
@@ -460,7 +460,7 @@ function buildResponsiveRows(
   modules: Module[],
   width: number,
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string[] {
   if (width <= 0 || modules.length === 0) return [];
 
@@ -550,9 +550,9 @@ function buildResponsiveRows(
 }
 
 function buildColoredFill(
-  bgColor: TokyoNightBackgroundRole | null,
+  bgColor: RapBackgroundRole | null,
   width: number,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string {
   if (width <= 0) return "";
   const fill = " ".repeat(width);
@@ -566,7 +566,7 @@ function buildWideStatusLine(
   leftSection: ReturnType<typeof buildSection>,
   rightSection: ReturnType<typeof buildSection>,
   icons: StatusIcons,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
   stretchSides: boolean,
 ): string {
   if (leftModules.length === 0 && rightModules.length === 0) return "";
@@ -622,7 +622,7 @@ function buildStatusLayout(
   ctx: ExtensionContext,
   branch: string,
   thinkingLevel: string,
-  config: TokyoConfigManager,
+  config: RapConfigManager,
   codexUsageStore?: Pick<CodexUsageStore, "getSnapshot">,
   kimiUsageStore?: Pick<KimiUsageStore, "getSnapshot">,
   liveUsage?: LiveSessionUsage,
@@ -632,7 +632,7 @@ function buildStatusLayout(
   // with Nerd Font glyphs that may be rendered as double-width by the terminal
   // but counted as single-width by visibleWidth()
   const icons = resolveIcons(config.get().iconMode);
-  const palette = createTokyoNightPalette(theme);
+  const palette = createRapPalette(theme);
   const statusModules: StatusModulesConfig = {
     ...DEFAULT_STATUS_MODULES,
     ...(config.get().statusModules ?? {}),
@@ -829,7 +829,7 @@ export function buildStatusLine(
   ctx: ExtensionContext,
   branch: string,
   thinkingLevel: string,
-  config: TokyoConfigManager,
+  config: RapConfigManager,
   codexUsageStore?: Pick<CodexUsageStore, "getSnapshot">,
   kimiUsageStore?: Pick<KimiUsageStore, "getSnapshot">,
   liveUsage?: LiveSessionUsage,
@@ -856,7 +856,7 @@ export function buildStatusLines(
   ctx: ExtensionContext,
   branch: string,
   thinkingLevel: string,
-  config: TokyoConfigManager,
+  config: RapConfigManager,
   codexUsageStore?: Pick<CodexUsageStore, "getSnapshot">,
   kimiUsageStore?: Pick<KimiUsageStore, "getSnapshot">,
   liveUsage?: LiveSessionUsage,

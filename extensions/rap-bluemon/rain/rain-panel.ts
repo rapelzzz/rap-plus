@@ -1,7 +1,7 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { TokyoConfigManager } from "../core/config.ts";
+import type { RapConfigManager } from "../core/config.ts";
 import { handleExtensionError } from "../core/errors.ts";
 import { requestHostRender } from "../core/pi-compat.ts";
 import {
@@ -9,8 +9,8 @@ import {
   renderFrameSegment,
 } from "../../todo/ui/frame-layout.ts";
 import {
-  createTokyoNightPalette,
-  type TokyoNightThemePalette,
+  createRapPalette,
+  type RapThemePalette,
 } from "../../todo/ui/theme-palette.ts";
 import type { RainAnimationManager, RainFrameSnapshot } from "./rain-manager.ts";
 
@@ -25,7 +25,7 @@ export interface RainPanelRenderOptions {
   frameEnabled: boolean;
   rainRows: number;
   snapshot: RainFrameSnapshot;
-  palette?: TokyoNightThemePalette;
+  palette?: RapThemePalette;
 }
 
 export function renderRainPanelLines(
@@ -99,15 +99,15 @@ export function renderRainPanelLines(
 }
 
 export interface RainPanelDependencies {
-  config: TokyoConfigManager;
+  config: RapConfigManager;
   rain: RainAnimationManager;
   getTheme?: () => Theme;
-  palette?: TokyoNightThemePalette;
+  palette?: RapThemePalette;
   /** Total segment budget, including its top edge; framed panels always keep that edge. */
   getAvailableRows?: (width: number) => number;
 }
 
-function paletteSignature(palette: TokyoNightThemePalette | undefined): string {
+function paletteSignature(palette: RapThemePalette | undefined): string {
   return palette ? [
     palette.fg("rain", RAIN_DROP), palette.fg("star", STAR),
     palette.fg("moon", MOON), palette.fg("frame", "│"),
@@ -157,7 +157,7 @@ export class RainPanelComponent implements Component {
         cached.terminalRows !== this.tui.terminal?.rows ||
         cached.terminalColumns !== this.tui.terminal?.columns) return true;
       const theme = this.dependencies.getTheme?.();
-      const palette = theme ? createTokyoNightPalette(theme) : this.dependencies.palette;
+      const palette = theme ? createRapPalette(theme) : this.dependencies.palette;
       const colors = paletteSignature(palette);
       if (cached.theme !== theme || cached.colors !== colors) return true;
       if (cached.effectiveRows === 0) return false;
@@ -193,7 +193,7 @@ export class RainPanelComponent implements Component {
 
       const theme = this.dependencies.getTheme?.();
       const palette = theme
-        ? createTokyoNightPalette(theme)
+        ? createRapPalette(theme)
         : this.dependencies.palette;
       const colors = paletteSignature(palette);
       const outputWidth = Math.max(0, Math.floor(width));

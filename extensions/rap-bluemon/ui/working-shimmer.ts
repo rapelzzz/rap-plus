@@ -1,5 +1,5 @@
 import { visibleWidth } from "@earendil-works/pi-tui";
-import type { TokyoNightThemePalette } from "../../todo/ui/theme-palette.ts";
+import type { RapThemePalette } from "../../todo/ui/theme-palette.ts";
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, {
   granularity: "grapheme",
@@ -9,7 +9,7 @@ export function renderWorkingText(
   text: string,
   animation: "forward" | "reverse" | "pulse",
   elapsedMs: number,
-  palette: TokyoNightThemePalette,
+  palette: RapThemePalette,
 ): string {
   if (animation === "pulse") {
     const intensity = (

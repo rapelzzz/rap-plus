@@ -1,8 +1,8 @@
 /**
  * rap-simplify — review & simplify recently changed code.
  *
- * Behavioral parity target: `pi-simplify` (MattDevy, MIT). The `/simplify`
- * command detects changed files and line ranges via `git diff` and instructs
+ * The `/rap-simplify` command detects changed files and line ranges via
+ * `git diff` and instructs
  * the agent to review only those changed lines for clarity, consistency, and
  * maintainability — preserving functionality, applying project standards,
  * constraining edits to the changed ranges, one file at a time, then running
@@ -18,7 +18,7 @@ import { runSubprocess } from "../_shared/subprocess.ts";
 import { buildDiffArgs, formatChangedFiles, parseGitDiff, parseSimplifyArgs } from "./utils.ts";
 
 export default function rapSimplify(pi: ExtensionAPI): void {
-	pi.registerCommand("simplify", {
+	pi.registerCommand("rap-simplify", {
 		description: "Simplify recently changed code (git diff). Options: --staged, --ref=<branch>, or file paths.",
 		handler: async (args, ctx) => {
 			const argv = args.trim().split(/\s+/).filter(Boolean);
@@ -56,7 +56,7 @@ export default function rapSimplify(pi: ExtensionAPI): void {
 Changed files and line ranges:
 ${formatChangedFiles(files)}
 
-Principles (from pi-simplify):
+Principles:
 - Preserve functionality: never change what the code does.
 - Apply project standards (CLAUDE.md / AGENTS.md conventions).
 - Enhance clarity: reduce complexity, eliminate redundancy, improve naming.

@@ -2,7 +2,7 @@ import {
   EXT_PREFIX,
   isStaleExtensionContextError,
 } from "../core/errors.ts";
-import { TokyoConfigManager } from "../core/config.ts";
+import { RapConfigManager } from "../core/config.ts";
 import type { RainRuntimeProfile } from "./rain-profile.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ const INITIAL_STARS: ReadonlyArray<{ readonly col: number; readonly row: number 
  * Does NOT own: rendering, TUI/UI/Theme imports, widget registration.
  */
 export class RainAnimationManager {
-  private config: TokyoConfigManager;
+  private config: RapConfigManager;
   private dependencies: RainManagerDependencies;
   private cancelTick: (() => void) | undefined;
   private active = false;
@@ -68,7 +68,7 @@ export class RainAnimationManager {
   private revision = 0;
 
   constructor(
-    config: TokyoConfigManager,
+    config: RapConfigManager,
     dependencies: RainManagerDependencies,
   ) {
     this.config = config;

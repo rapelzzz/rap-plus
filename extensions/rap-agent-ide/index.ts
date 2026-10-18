@@ -1,7 +1,7 @@
 /**
  * rap-agent-ide — guarded IDE-style assistance.
  *
- * Behavioral target: `pi-agent-ide` (alexshpunt, MIT). Full surface:
+ * Full surface:
  *   - Guarded editing (safety validation + interactive confirm)
  *   - Code search (ripgrep) + git diff inspection
  *   - Terminal pool (persistent shell sessions)
