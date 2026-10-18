@@ -100,6 +100,9 @@ export interface CpuProfileResult {
 	durationMs: number;
 	sampleCount: number;
 	topFunctions: HotFunction[];
+	/** True when the script exited before the profiler could be stopped (e.g. a
+	 * trivial/fast script). The profile is still written but may have no samples. */
+	earlyExit?: boolean;
 }
 
 /** Capture a CPU profile of `script` for `durationMs`, writing a `.cpuprofile`. */
@@ -113,8 +116,9 @@ export async function captureCpuProfile(
 		stdio: ["pipe", "pipe", "pipe"],
 	});
 	const stderr: string[] = [];
+	let exited = false;
 	proc.stderr.on("data", (c: Buffer) => stderr.push(c.toString("utf8")));
-	try {
+	proc.on("exit", () => { exited = true; });	try {
 		const wsUrl = await waitForBanner(proc, stderr, opts.timeoutMs ?? 8000);
 		await new Promise((r) => setTimeout(r, 150));
 		const client = await CdpClient.connect(wsUrl, { timeoutMs: 5000 });
@@ -122,14 +126,27 @@ export async function captureCpuProfile(
 			await client.send("Profiler.enable", {});
 			await client.send("Profiler.start", {});
 			await client.send("Runtime.runIfWaitingForDebugger", {});
-			await new Promise((r) => setTimeout(r, durationMs));
-			const stopRes = (await client.send("Profiler.stop", {}, { timeoutMs: 5000 })) as { profile?: CpuProfile };
-			const profile = stopRes.profile ?? {};
+			// Wait the requested duration, but bail early if the script exits. A
+			// fast script completes before the full duration and would otherwise
+			// leave Profiler.stop talking to a closed connection.
+			const start = Date.now();
+			while (Date.now() - start < durationMs && !exited) {
+				await new Promise((r) => setTimeout(r, Math.min(50, durationMs)));
+			}
+			let profile: CpuProfile = {};
+			let earlyExit = false;
+			try {
+				const stopRes = (await client.send("Profiler.stop", {}, { timeoutMs: 2000 })) as { profile?: CpuProfile };
+				profile = stopRes.profile ?? {};
+			} catch {
+				// Script exited before the profiler could be stopped; no samples.
+				earlyExit = true;
+			}
 			const sampleCount = profile.samples?.length ?? 0;
 			const top = parseProfileTopFunctions(profile);
 			const outFile = path.resolve(opts.cwd ?? process.cwd(), opts.outFile ?? "rap-cpu-profile.cpuprofile");
 			fs.writeFileSync(outFile, JSON.stringify(profile));
-			return { file: outFile, durationMs, sampleCount, topFunctions: top };
+			return { file: outFile, durationMs, sampleCount, topFunctions: top, earlyExit };
 		} finally {
 			client.close();
 		}

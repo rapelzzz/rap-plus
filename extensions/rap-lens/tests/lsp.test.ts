@@ -123,3 +123,33 @@ test("TsLanguageService returns [] on missing file without throwing", () => {
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("TsLanguageService re-reads a file after it is edited (mtime invalidation)", () => {
+	const dir = makeTempProject();
+	try {
+		const svc = TsLanguageService.create(dir);
+		assert.ok(svc);
+		if (!svc) return;
+		const defs0 = svc.getDefinition("main.ts", 2, 21);
+		assert.ok(defs0.length > 0);
+		const line0 = defs0[0].line;
+
+		// Rewrite lib.ts, prepending a comment so greet moves down one line.
+		fs.writeFileSync(
+			path.join(dir, "lib.ts"),
+			["// edited: greet moved down", "export function greet(name: string): string {", "  return 'hi ' + name;", "}"].join("\n") + "\n",
+		);
+		// Force a distinct mtime in case the rewrite fell in the same millisecond.
+		const future = (Date.now() / 1000) + 10;
+		fs.utimesSync(path.join(dir, "lib.ts"), future, future);
+
+		const defs1 = svc.getDefinition("main.ts", 2, 21);
+		assert.ok(defs1.length > 0);
+		const line1 = defs1[0].line;
+		// Without mtime invalidation the cached snapshot would still report the
+		// old line; the fix re-reads on mtime change so the definition moves down.
+		assert.ok(line1 > line0, `expected definition to move down (was ${line0}, now ${line1})`);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});

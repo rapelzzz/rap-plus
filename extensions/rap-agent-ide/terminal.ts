@@ -33,7 +33,7 @@ export interface SendResult {
 const DEFAULT_SHELL = process.env.SHELL || "/bin/bash";
 const DEFAULT_MAX_BUFFER = 262144; // 256KB per stream
 const DEFAULT_WAIT_MS = 8000;
-const MAX_SESSIONS = 8;
+export const MAX_SESSIONS = 8;
 
 /** Pure: cap output to maxBytes with an ellipsis notice. */
 export function truncateOutput(buf: string, maxBytes: number): string {
@@ -78,6 +78,9 @@ export class TerminalPool {
 
 	/** Create a persistent shell session. Returns the session id. */
 	create(cwd: string, env: Record<string, string> = {}): string {
+		// Reclaim slots held by dead sessions so the pool never refuses a new
+		// session just because MAX_SESSIONS dead ones are still in the map.
+		this.pruneDead();
 		if (this.sessions.size >= MAX_SESSIONS) {
 			throw new Error(`terminal pool full (max ${MAX_SESSIONS} sessions)`);
 		}
@@ -125,8 +128,22 @@ export class TerminalPool {
 		const beforeOut = s.stdout.length;
 		const beforeErr = s.stderr.length;
 		s.lastCommand = command;
-		s.proc.stdin.write(command + "\n");
-		s.proc.stdin.write(`printf '%s\\n' '${marker}'\n`);
+		// Writing to a shell that has just exited (e.g. after `exit 0`) throws
+		// EPIPE on the stdin write. Treat that as the session dying mid-send:
+		// mark it dead and return captured output, rather than propagating EPIPE.
+		try {
+			s.proc.stdin.write(command + "\n");
+			s.proc.stdin.write(`printf '%s\\n' '${marker}'\n`);
+		} catch {
+			s.alive = false;
+			return {
+				id,
+				stdout: s.stdout.slice(beforeOut),
+				stderr: s.stderr.slice(beforeErr),
+				exitCode: s.exitCode,
+				timedOut: true,
+			};
+		}
 		const deadline = Date.now() + waitMs;
 		let sawMarker = false;
 		while (Date.now() < deadline) {
@@ -136,8 +153,18 @@ export class TerminalPool {
 			}
 			await sleep(15);
 		}
-		let out = s.stdout.slice(beforeOut);
-		let err = s.stderr.slice(beforeErr);
+		let out: string;
+		let err: string;
+		if (s.stdout.length >= beforeOut) {
+			out = s.stdout.slice(beforeOut);
+			err = s.stderr.slice(beforeErr);
+		} else {
+			// The buffer was capped (oldest content dropped) during the command, so
+			// `beforeOut` now points into discarded content and slice() would return
+			// empty. Best-effort: take the kept tail up to the marker.
+			out = s.stdout;
+			err = s.stderr;
+		}
 		const markerIdx = out.indexOf(marker);
 		if (markerIdx >= 0) {
 			out = out.slice(0, markerIdx).replace(/\n$/, "");
@@ -149,6 +176,13 @@ export class TerminalPool {
 			exitCode: s.exitCode,
 			timedOut: !sawMarker,
 		};
+	}
+
+	/** Remove dead sessions from the map, freeing their slots. */
+	private pruneDead(): void {
+		for (const [id, s] of this.sessions) {
+			if (!s.alive) this.sessions.delete(id);
+		}
 	}
 
 	/** Read the full accumulated output without consuming. */

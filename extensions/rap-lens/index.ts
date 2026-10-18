@@ -35,6 +35,7 @@ import { symbolSearch, formatSymbolHits, moduleReport, readSymbol } from "./symb
 import { detectAstGrep, astGrepSearch, astGrepReplace, formatAstGrepMatches } from "./astgrep.ts";
 import { applyTsCodeFixes, runEslintFix, runPrettierWrite, formatAutofixResults } from "./autofix.ts";
 import { writeLensMap } from "./lensmap.ts";
+import { isPathSafe } from "../_shared/safety.ts";
 import * as path from "node:path";
 
 const TriageMarkSchema = StringEnum(["falsePositive", "suppressed", "deferred", "flagFix"] as const, {
@@ -75,6 +76,7 @@ export default function rapLens(pi: ExtensionAPI): void {
 				ctx.ui.notify("rap-lens: could not run diagnostics.", "error");
 				return;
 			}
+			triage.attachFilePath(path.join(ctx.cwd, ".rap-lens-triage.json"));
 			const active = diagnostics.filter((d) => triage.isActive(diagnosticKey(d.file, d.line, d.message)));
 			const report = formatDiagnostics(active);
 			const triagedOut = diagnostics.length - active.length;
@@ -224,12 +226,19 @@ export default function rapLens(pi: ExtensionAPI): void {
 			const bin = await getAstGrep(ctx.cwd);
 			if (!bin) return textResult("rap-lens: ast-grep not installed. Run `npm install --no-save @ast-grep/cli`.");
 			if (params.paths.length === 0) return textResult("No paths provided.");
-			const matches = await astGrepSearch(bin, params.pattern, params.paths, {
-				cwd: ctx.cwd,
-				lang: params.language,
-				signal,
-			});
-			return textResult(`${matches.length} match(es)\n${formatAstGrepMatches(matches, ctx.cwd)}`);
+			const pathErr = validatePaths(ctx.cwd, params.paths);
+			if (pathErr) return textResult(pathErr);
+			try {
+				const matches = await astGrepSearch(bin, params.pattern, params.paths, {
+					cwd: ctx.cwd,
+					lang: params.language,
+					signal,
+				});
+				const hint = matches.length === 0 ? "\n(0 matches — also double-check pattern syntax; ast-grep silently rejects some invalid patterns)" : "";
+				return textResult(`${matches.length} match(es)\n${formatAstGrepMatches(matches, ctx.cwd)}${hint}`);
+			} catch (e) {
+				return textResult(`rap-lens ast-grep search failed: ${(e as Error).message}`);
+			}
 		},
 	});
 
@@ -249,12 +258,18 @@ export default function rapLens(pi: ExtensionAPI): void {
 			const bin = await getAstGrep(ctx.cwd);
 			if (!bin) return textResult("rap-lens: ast-grep not installed.");
 			if (params.paths.length === 0) return textResult("No paths provided.");
-			const res = await astGrepReplace(bin, params.pattern, params.replacement, params.paths, {
-				cwd: ctx.cwd,
-				lang: params.language,
-				signal,
-			});
-			return textResult(`ast-grep replace: ${res.changed} file(s) changed.`);
+			const pathErr = validatePaths(ctx.cwd, params.paths);
+			if (pathErr) return textResult(pathErr);
+			try {
+				const res = await astGrepReplace(bin, params.pattern, params.replacement, params.paths, {
+					cwd: ctx.cwd,
+					lang: params.language,
+					signal,
+				});
+				return textResult(`ast-grep replace: ${res.changed} file(s) changed.`);
+			} catch (e) {
+				return textResult(`rap-lens ast-grep replace failed: ${(e as Error).message}`);
+			}
 		},
 	});
 
@@ -270,16 +285,22 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: false },
 		exposure: "model-only",
 		async execute(_id, params, signal, _onUpdate, ctx) {
-			const svc = getService(ctx.cwd);
-			const results = [];
-			if (svc) {
-				results.push(applyTsCodeFixes(svc, params.file, ctx.cwd));
-			} else {
-				results.push({ tool: "typescript", fixesApplied: 0, filesChanged: [], notes: "LanguageService unavailable" });
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
+			try {
+				const svc = getService(ctx.cwd);
+				const results = [];
+				if (svc) {
+					results.push(applyTsCodeFixes(svc, params.file, ctx.cwd));
+				} else {
+					results.push({ tool: "typescript", fixesApplied: 0, filesChanged: [], notes: "LanguageService unavailable" });
+				}
+				results.push(await runEslintFix(ctx.cwd, [params.file], signal));
+				results.push(await runPrettierWrite(ctx.cwd, [params.file], signal));
+				return textResult(formatAutofixResults(results));
+			} catch (e) {
+				return textResult(`rap-lens autofix failed: ${(e as Error).message}`);
 			}
-			results.push(await runEslintFix(ctx.cwd, [params.file], signal));
-			results.push(await runPrettierWrite(ctx.cwd, [params.file], signal));
-			return textResult(formatAutofixResults(results));
 		},
 	});
 
@@ -297,10 +318,11 @@ export default function rapLens(pi: ExtensionAPI): void {
 		}),
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
-		async execute(_id, params, _signal, _onUpdate, _ctx) {
+		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const key = diagnosticKey(params.file, params.line, params.message);
+			triage.attachFilePath(path.join(ctx.cwd, ".rap-lens-triage.json"));
 			triage.mark(params.mark as TriageMark, key, params.reason ?? "");
-			return textResult(`Marked ${params.file}:${params.line} as ${params.mark}${params.reason ? ` (${params.reason})` : ""}. Use /lens to see remaining findings.`);
+			return textResult(`Marked ${params.file}:${params.line} as ${params.mark}${params.reason ? ` (${params.reason})` : ""}. Use /rap-lens to see remaining findings.`);
 		},
 	});
 }
@@ -310,4 +332,14 @@ function textResult(text: string): {
 	details: undefined;
 } {
 	return { content: [{ type: "text", text }], details: undefined };
+}
+
+/** Validate that every path resolves inside the project root. Returns an error string or null. */
+export function validatePaths(cwd: string, paths: readonly string[]): string | null {
+	for (const p of paths) {
+		if (!isPathSafe(cwd, p)) {
+			return `Refusing: path escapes project root: ${p}`;
+		}
+	}
+	return null;
 }

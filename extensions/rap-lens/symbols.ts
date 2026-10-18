@@ -148,8 +148,8 @@ const SYMBOL_RE = /\b(?:export\s+)?(?:async\s+)?(?:function|class|interface|type
 function regexSymbolSearch(query: string, cwd: string): SymbolHit[] {
 	if (!query) return [];
 	const hits: SymbolHit[] = [];
-	const re = new RegExp(SYMBOL_RE);
-	re.lastIndex = 0;
+	// Fresh global regex per call — never share lastIndex across invocations.
+	const re = new RegExp(SYMBOL_RE.source, "g");
 	const files = collectScriptFiles(cwd, 200);
 	for (const file of files) {
 		let content: string;
@@ -158,10 +158,9 @@ function regexSymbolSearch(query: string, cwd: string): SymbolHit[] {
 		} catch {
 			continue;
 		}
-		const lines = content.split("\n");
 		let m: RegExpExecArray | null;
-		SYMBOL_RE.lastIndex = 0;
-		while ((m = SYMBOL_RE.exec(content)) !== null && hits.length < 50) {
+		re.lastIndex = 0;
+		while ((m = re.exec(content)) !== null && hits.length < 50) {
 			const name = m[1];
 			if (!name.toLowerCase().includes(query.toLowerCase())) continue;
 			const before = content.slice(0, m.index);
@@ -183,9 +182,10 @@ function regexModuleReport(file: string, cwd: string): string {
 	}
 	const lines = content.split("\n");
 	const out: string[] = [`**Module outline — ${path.relative(cwd, abs) || file}**`, ""];
-	SYMBOL_RE.lastIndex = 0;
+	// Non-global regex: no lastIndex state to leak between lines.
+	const lineRe = new RegExp(SYMBOL_RE.source);
 	for (let i = 0; i < lines.length; i++) {
-		const m = SYMBOL_RE.exec(lines[i]);
+		const m = lineRe.exec(lines[i]);
 		if (m) out.push(`${i + 1}: ${lines[i].trim()}`);
 	}
 	return out.length <= 2 ? `Module report: no outline for ${file}` : out.join("\n");

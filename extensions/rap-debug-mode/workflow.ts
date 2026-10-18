@@ -102,7 +102,11 @@ export function applyCheckpoint(state: DebugState, input: CheckpointInput): { st
 	if (input.stage) {
 		const check = canAdvanceTo(next, input.stage);
 		if (!check.ok) {
-			return { state, ok: false, reason: check.reason, guidance: check.reason ?? "Checkpoint rejected." };
+			// Stage transition rejected, but the additive inputs (evidence,
+			// hypothesis, probe) are still valid standalone data — keep them in
+			// the state so the model doesn't lose work. Only the stage advance is
+			// refused (next.stage is still the previous stage here).
+			return { state: next, ok: false, reason: check.reason, guidance: check.reason ?? "Checkpoint rejected." };
 		}
 		next.stage = input.stage;
 	}

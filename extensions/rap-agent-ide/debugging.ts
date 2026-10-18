@@ -37,6 +37,10 @@ export interface PausedState {
 
 const NOT_PAUSED: PausedState = { paused: false, reason: "running", callFrames: [] };
 const STEP_TIMEOUT_MS = 10000;
+/** Timeout for resume: a pause is usually hit within milliseconds. A program
+ * that runs to completion keeps the process alive (the inspector connection
+ * prevents exit), so we must not block for the full step timeout. */
+const RESUME_TIMEOUT_MS = 3000;
 const MAX_VARS = 20;
 
 interface PausedEventParams {
@@ -55,6 +59,7 @@ export class DebugSession {
 	private client: CdpClient | null = null;
 	private scriptUrlToId = new Map<string, string>();
 	private state: PausedState = NOT_PAUSED;
+	private exited = false;
 	private topCallFrameId: string | null = null;
 	private topLocalScopeObjectId: string | null = null;
 	private resolvePause: ((s: PausedState) => void) | null = null;
@@ -67,7 +72,9 @@ export class DebugSession {
 	static async start(script: string, opts: { args?: string[]; cwd?: string; timeoutMs?: number } = {}): Promise<DebugSession> {
 		const id = `dbg-${Date.now()}`;
 		const session = new DebugSession(id);
-		const args = ["--inspect-brk=0", ...script.split(" ").filter(Boolean)];
+		// `script` is a single file path — never split on whitespace, or paths
+		// containing spaces break. Extra CLI args are passed via opts.args.
+		const args = ["--inspect-brk=0", script, ...(opts.args ?? [])];
 		const proc = spawn(process.execPath, [...args, ...(opts.args ?? [])], {
 			cwd: opts.cwd,
 			stdio: ["pipe", "pipe", "pipe"],
@@ -75,6 +82,17 @@ export class DebugSession {
 		session.proc = proc;
 		const stderr: string[] = [];
 		proc.stderr.on("data", (c: Buffer) => stderr.push(c.toString("utf8")));
+		// Detect program completion so waitForPause doesn't block for the full
+		// timeout after the last breakpoint/resume runs the program to exit.
+		proc.on("exit", (code, sig) => {
+			session.exited = true;
+			session.state = { ...NOT_PAUSED, reason: sig ? `exited (signal ${sig})` : `exited (code ${code ?? 0})` };
+			if (session.resolvePause) {
+				const r = session.resolvePause;
+				session.resolvePause = null;
+				r(NOT_PAUSED);
+			}
+		});
 
 		// Wait for the inspector banner.
 		const wsUrl = await new Promise<string>((resolve, reject) => {
@@ -131,6 +149,8 @@ export class DebugSession {
 		// Race guard: if the pause event arrived before we started waiting (e.g.
 		// the entry pause fired during Debugger.enable), resolve immediately.
 		if (this.state.paused) return Promise.resolve(this.state);
+		// Program already exited: don't wait for a pause that will never come.
+		if (this.exited) return Promise.resolve(NOT_PAUSED);
 		return new Promise((resolve) => {
 			const timer = setTimeout(() => {
 				this.resolvePause = null;
@@ -166,7 +186,7 @@ export class DebugSession {
 		this.state = NOT_PAUSED;
 		this.topCallFrameId = null;
 		await this.client.send("Debugger.resume", {});
-		return this.waitForPause(STEP_TIMEOUT_MS);
+		return this.waitForPause(RESUME_TIMEOUT_MS);
 	}
 
 	/** Step over the current statement. */

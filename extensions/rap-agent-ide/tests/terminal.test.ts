@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { TerminalPool, truncateOutput, formatSessionList } from "../terminal.ts";
+import { TerminalPool, truncateOutput, formatSessionList, MAX_SESSIONS } from "../terminal.ts";
 
 test("truncateOutput leaves short buffers untouched, caps long ones", () => {
 	assert.equal(truncateOutput("abc", 100), "abc");
@@ -71,6 +71,37 @@ test("TerminalPool: respects a max session cap", () => {
 	try {
 		for (let i = 0; i < 8; i++) pool.create(dir);
 		assert.throws(() => pool.create(dir), /terminal pool full/);
+	} finally {
+		pool.killAll();
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+
+
+test("TerminalPool: prunes dead sessions so the pool never fills with corpses", async () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-ide-term-"));
+	const pool = new TerminalPool();
+	try {
+		// Fill the pool with live sessions first (cap reached).
+		const ids: string[] = [];
+		for (let i = 0; i < MAX_SESSIONS; i++) ids.push(pool.create(dir));
+		// Now make every shell exit naturally. Dead sessions stay in the map
+		// (only kill() removes immediately), so the pool is full of corpses.
+		await Promise.all(ids.map((id) => pool.send(id, "exit 0", { waitMs: 250 })));
+		// Wait for the shells to actually exit. Under concurrent test load the
+		// child may take longer than a fixed sleep, so poll (up to ~1s).
+		const deadline = Date.now() + 1000;
+		while (Date.now() < deadline && ids.some((id) => pool.output(id).alive)) {
+			await new Promise((r) => setTimeout(r, 30));
+		}
+		for (const id of ids) assert.equal(pool.output(id).alive, false);
+
+		// create() must prune the dead sessions and succeed — not throw
+		// "terminal pool full" because the map is full of corpses.
+		const fresh = pool.create(dir);
+		assert.ok(fresh, "create should succeed after pruning dead sessions");
+		assert.equal(pool.output(fresh).alive, true);
 	} finally {
 		pool.killAll();
 		fs.rmSync(dir, { recursive: true, force: true });

@@ -92,13 +92,21 @@ function collectScriptFiles(cwd: string): string[] {
 /** Snapshot reader: reads file content from disk, caching in the given map. */
 type SnapshotFn = (fileName: string) => string | undefined;
 
-function makeSnapshotFn(): { cache: Map<string, string>; read: SnapshotFn } {
-	const cache = new Map<string, string>();
+function makeSnapshotFn(): { cache: Map<string, { mtimeMs: number; content: string }>; read: SnapshotFn } {
+	// Cache keyed by mtimeMs so an edited file is re-read instead of served stale.
+	const cache = new Map<string, { mtimeMs: number; content: string }>();
 	const read: SnapshotFn = (fileName) => {
-		if (cache.has(fileName)) return cache.get(fileName);
+		let mtimeMs: number;
+		try {
+			mtimeMs = fs.statSync(fileName).mtimeMs;
+		} catch {
+			return undefined;
+		}
+		const cached = cache.get(fileName);
+		if (cached && cached.mtimeMs === mtimeMs) return cached.content;
 		try {
 			const content = fs.readFileSync(fileName, "utf8");
-			cache.set(fileName, content);
+			cache.set(fileName, { mtimeMs, content });
 			return content;
 		} catch {
 			return undefined;
@@ -138,7 +146,16 @@ export class TsLanguageService {
 			const host: ts.LanguageServiceHost = {
 				getCompilationSettings: () => settings,
 				getScriptFileNames: () => fileNames,
-				getScriptVersion: () => "1",
+				// Version per file derived from mtime: when a file is edited its
+				// version changes, so the document registry invalidates its cached
+				// AST instead of reusing stale syntax trees.
+				getScriptVersion: (fileName) => {
+					try {
+						return String(fs.statSync(fileName).mtimeMs);
+					} catch {
+						return "0";
+					}
+				},
 				getScriptSnapshot: (fileName) => {
 					const content = snapshot(fileName);
 					return content !== undefined ? ts.ScriptSnapshot.fromString(content) : undefined;

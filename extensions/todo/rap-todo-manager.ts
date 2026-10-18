@@ -153,6 +153,17 @@ export class RapTodoManager {
   }
 
   private commit(): RapTodoOpResult {
+    // Corrupt data is never silently overwritten: refuse to persist any
+    // mutation so the original (corrupt but recoverable) file is preserved.
+    // The in-memory project may have been tentatively mutated, but it is not
+    // saved; callers see a failure and the file stays intact for recovery.
+    if (this.isCorrupt()) {
+      return {
+        ok: false,
+        error:
+          "Todo data is corrupt; refusing to overwrite. Recover or delete the todos file manually.",
+      };
+    }
     this.project.updatedAt = nowIso();
     const save = this.storage.save(this.projectRoot, this.project);
     if (!save.ok) return { ok: false, error: save.error };

@@ -96,3 +96,16 @@ test("METHODOLOGY mentions all six stages", () => {
 		assert.match(METHODOLOGY, new RegExp(stage), `METHODOLOGY missing ${stage}`);
 	}
 });
+
+test("applyCheckpoint keeps additive input even when stage is rejected", () => {
+	// Gathering evidence is always valid; the stage advance to 'fix' is rejected
+	// because repro isn't confirmed, but the evidence must survive in the state.
+	let s = freshDebugState();
+	const r = applyCheckpoint(s, { evidence: "stack trace from prod", stage: "fix", fix: "guard" });
+	assert.equal(r.ok, false);
+	assert.match(r.reason!, /reproduction/i);
+	assert.equal(r.state.stage, "investigate"); // stage not advanced
+	// Additive inputs are retained (the bug previously discarded them).
+	assert.equal(r.state.hasEvidence, true);
+	assert.equal(r.state.fixDescription, "guard");
+});

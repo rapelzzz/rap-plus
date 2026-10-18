@@ -7,14 +7,33 @@
  */
 
 // Mutating/destructive patterns that must be blocked in read-only modes.
+// Beyond obvious mutations, this catches the string-classifier bypasses:
+// pipes/substitution into interpreters (execute arbitrary code), find -exec,
+// awk system()/getline, xargs, process substitution, and backticks.
 const DESTRUCTIVE_PATTERNS: readonly RegExp[] = [
 	/\brm\b/i, /\brmdir\b/i, /\bmv\b/i, /\bcp\b/i, /\bmkdir\b/i, /\btouch\b/i,
 	/\bchmod\b/i, /\bchown\b/i, /\bchgrp\b/i, /\bln\b/i, /\btee\b/i, /\btruncate\b/i,
 	/\bdd\b/i, /\bshred\b/i,
-	/(^|[^<])>(?!>)/, />>/,
-	/\bnpm\s+(install|uninstall|update|ci|link|publish)/i,
-	/\byarn\s+(add|remove|install|publish)/i,
-	/\bpnpm\s+(add|remove|install|publish)/i,
+	/(^|[^<])>(?!>)/, />>/, /<\(/, /`/,
+	// Pipe (or trailing) into an interpreter — executes arbitrary code.
+	/\|\s*(bash|sh|zsh|dash|ksh|fish|csh|tcsh|node|deno|bun|python\d?|perl|ruby|php|lua|tclsh)\b/i,
+	// Direct interpreter invocation with eval/exec flags.
+	/\bnode\b\s+(-e|--eval|-p|--print|-r|--require)\b/i,
+	/\bdeno\b\s+(-e|--eval)\b/i,
+	/\bpython\d?\b\s+(-c|-m)\b/i,
+	/\bperl\b\s+(-e|-M)\b/i,
+	/\bruby\b\s+(-e)\b/i,
+	/\bphp\b\s+(-r|-f)\b/i,
+	// Command execution via find/awk/xargs.
+	/\bfind\b.*\s-exec(dir)?\b/i,
+	/\bawk\b.*\b(system|getline)\b/i,
+	/\bxargs\b/i,
+	// Network writes to disk (side-effect in read-only mode).
+	/\bcurl\b.*(-o|--output)\b/i,
+	/\bwget\b.*(-O|--output-document)\b(?!\s*-)/i,
+	/\bnpm\s+(install|uninstall|update|ci|link|publish|run|exec)/i,
+	/\byarn\s+(add|remove|install|publish|run)/i,
+	/\bpnpm\s+(add|remove|install|publish|run|exec)/i,
 	/\bpip\s+(install|uninstall)/i,
 	/\bapt(-get)?\s+(install|remove|purge|update|upgrade)/i,
 	/\bbrew\s+(install|uninstall|upgrade)/i,

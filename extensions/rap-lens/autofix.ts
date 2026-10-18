@@ -130,19 +130,42 @@ export async function runEslintFix(
 	if (!bin) {
 		return { tool: "eslint", fixesApplied: 0, filesChanged: [], notes: "eslint not installed" };
 	}
+	// Snapshot file contents before fixing so we can count ACTUAL changes
+	// (eslint --fix doesn't reliably report per-file changes on stdout).
+	const before = new Map<string, string>();
+	for (const p of paths) {
+		try {
+			before.set(p, fs.readFileSync(path.resolve(cwd, p), "utf8"));
+		} catch {
+			/* missing file */
+		}
+	}
 	const r = await runSubprocess(bin, ["--fix", ...paths], {
 		cwd,
 		signal,
 		timeoutMs: 30000,
 		maxOutputBytes: 20480,
 	});
-	// eslint exits 0 when all fixable issues resolved; non-zero means remaining errors.
+	const changed: string[] = [];
+	for (const p of paths) {
+		const abs = path.resolve(cwd, p);
+		try {
+			const after = fs.readFileSync(abs, "utf8");
+			if (before.has(p) && before.get(p) !== after) changed.push(p);
+		} catch {
+			/* file removed by run */
+		}
+	}
 	const remaining = r.stderr.trim() || r.stdout.trim();
 	return {
 		tool: "eslint",
-		fixesApplied: r.exitCode === 0 ? paths.length : 0,
-		filesChanged: r.exitCode === 0 ? [...paths] : [],
-		notes: remaining ? `remaining issues (exit ${r.exitCode})` : undefined,
+		fixesApplied: changed.length,
+		filesChanged: changed,
+		notes: changed.length === 0
+			? remaining
+				? `remaining issues (exit ${r.exitCode})`
+				: "no fixable issues"
+			: undefined,
 	};
 }
 

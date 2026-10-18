@@ -29,7 +29,11 @@ export interface ToolAvailability {
 	golangciLint: boolean;
 }
 
-/** Check whether a tool is available: local node_modules/.bin first, then PATH. */
+/**
+ * Check whether a tool is available: local node_modules/.bin first, then a
+ * synchronous scan of PATH (no spawn, so it stays fast and testable). Returns
+ * the resolved executable path or null.
+ */
 export function detectTool(name: string, cwd: string): boolean {
 	const localBin = path.join(cwd, "node_modules", ".bin", name);
 	try {
@@ -37,10 +41,26 @@ export function detectTool(name: string, cwd: string): boolean {
 	} catch {
 		/* ignore */
 	}
-	// PATH check via `which` (POSIX) / `where` fallback is environment-dependent;
-	// keep it synchronous-faithful by trying the local bin only here. PATH
-	// resolution is handled lazily in runDiagnostics via spawn errors.
-	return false;
+	return findOnPath(name) != null;
+}
+
+/** Resolve `name` against $PATH by checking each directory for an executable. */
+function findOnPath(name: string): string | null {
+	const pathEnv = process.env.PATH ?? process.env.Path ?? "";
+	if (!pathEnv) return null;
+	const exts = process.platform === "win32" ? (process.env.PATHEXT ?? "").split(";").filter(Boolean) : [""];
+	for (const dir of pathEnv.split(process.platform === "win32" ? ";" : ":")) {
+		if (!dir) continue;
+		for (const ext of exts) {
+			const candidate = path.join(dir, name + ext);
+			try {
+				if (fs.existsSync(candidate)) return candidate;
+			} catch {
+				/* ignore unreadable dirs */
+			}
+		}
+	}
+	return null;
 }
 
 /** Detect available language tooling in `cwd`. */

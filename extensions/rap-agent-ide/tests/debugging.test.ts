@@ -91,3 +91,39 @@ test("DebugSession stop cleans up the target process", async () => {
 		fs.rmSync(path.dirname(file), { recursive: true, force: true });
 	}
 });
+
+test("DebugSession resume returns promptly when the program runs to completion", async () => {
+	const file = writeScript();
+	try {
+		const session = await DebugSession.start(file, { timeoutMs: 8000 });
+		// No breakpoint set: resume lets the program run to completion. The
+		// inspector keeps the process alive after completion, so the proc does
+		// not exit — resume must still return promptly (well under the 10s step
+		// timeout) instead of hanging.
+		const start = Date.now();
+		const after = await session.resume();
+		const elapsed = Date.now() - start;
+		assert.equal(after.paused, false);
+		assert.ok(elapsed < 5000, `resume should return promptly on completion, took ${elapsed}ms`);
+		await session.stop();
+	} finally {
+		fs.rmSync(path.dirname(file), { recursive: true, force: true });
+	}
+});
+
+test("DebugSession handles script paths containing spaces", async () => {
+	// mkdtemp gives no spaces; create a nested dir whose name has a space.
+	const base = fs.mkdtempSync(path.join(os.tmpdir(), "rap-ide-dbg-"));
+	const dir = path.join(base, "with space dir");
+	fs.mkdirSync(dir);
+	const file = path.join(dir, "target.mjs");
+	fs.writeFileSync(file, "export const M = 1;\nconsole.log(M);\n");
+	try {
+		const session = await DebugSession.start(file, { timeoutMs: 8000 });
+		const status = await session.status();
+		assert.equal(status.paused, true);
+		await session.stop();
+	} finally {
+		fs.rmSync(base, { recursive: true, force: true });
+	}
+});

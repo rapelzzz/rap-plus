@@ -15,7 +15,7 @@ import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
 import { isSafeCommand } from "../_shared/bash-allowlist.ts";
-import { extractTodoItems, markCompletedSteps, type TodoItem } from "./utils.ts";
+import { extractTodoItems, markCompletedSteps, resolvePlanModeTools, filterRegisteredTools, type TodoItem } from "./utils.ts";
 
 // Read-only tools retained in plan mode; edit/write removed.
 const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "questionnaire"];
@@ -77,17 +77,22 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 
 	const uniqueToolNames = (names: string[]): string[] => [...new Set(names)];
 
+	/** Names of tools actually registered with Pi (filters out hardcoded names
+	 * that don't exist in this build, e.g. `find`/`ls`/`questionnaire`). */
+	function registeredToolNames(): Set<string> {
+		const all = pi.getAllTools() as unknown[];
+		return new Set(all.map((t) => (typeof t === "string" ? t : (t as { name?: string }).name ?? "")));
+	}
+
 	function getPlanModeTools(activeToolNames: string[]): string[] {
-		return uniqueToolNames([
-			...activeToolNames.filter((name) => !PLAN_MODE_DISABLED_TOOLS.has(name)),
-			...PLAN_MODE_TOOLS,
-		]);
+		return uniqueToolNames(resolvePlanModeTools(activeToolNames, PLAN_MODE_TOOLS, registeredToolNames(), PLAN_MODE_DISABLED_TOOLS));
 	}
 
 	function getNormalModeTools(activeToolNames: string[]): string[] {
+		const registered = registeredToolNames();
 		return uniqueToolNames([
-			...NORMAL_MODE_TOOLS,
-			...activeToolNames.filter((name) => !PLAN_MANAGED_TOOLS.has(name)),
+			...filterRegisteredTools(NORMAL_MODE_TOOLS, registered),
+			...activeToolNames.filter((name) => !PLAN_MANAGED_TOOLS.has(name) && registered.has(name)),
 		]);
 	}
 

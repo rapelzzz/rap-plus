@@ -1,9 +1,9 @@
 /**
  * Agent discovery and configuration for rap-subagents.
  *
- * Adapted faithfully from Pi's bundled `examples/extensions/subagent/agents.ts`
- * (verified canonical reference). Reads agent definitions (markdown + YAML
- * frontmatter) from the user agent dir and the nearest project `.pi/agents`.
+ * Reads agent definitions (markdown + YAML frontmatter) from the user agent
+ * dir and the nearest project `.pi/agents`, merging them by name (project
+ * agents take precedence when scope is "both").
  */
 
 import * as fs from "node:fs";

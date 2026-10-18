@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { parseDiagnostics, formatDiagnostics, detectTool, detectTools } from "../diagnostics.ts";
 import { TriageStore, diagnosticKey, serializeTriage } from "../triage.ts";
+import { validatePaths } from "../index.ts";
 
 // ── diagnostics parsing ─────────────────────────────────────────────────────
 test("parseDiagnostics parses tsc-style output", () => {
@@ -101,4 +102,48 @@ test("TriageStore clear and serialize", () => {
 	const ser = serializeTriage(store);
 	assert.equal(ser.length, 1);
 	assert.equal(ser[0].mark, "deferred");
+});
+
+// ── path validation for mutating tools ──────────────────────────────────────
+test("validatePaths rejects traversal and symlink escapes", () => {
+	const cwd = process.cwd();
+	assert.equal(validatePaths(cwd, ["src/a.ts"]), null);
+	assert.ok(validatePaths(cwd, ["../../../etc/passwd"]));
+	assert.ok(validatePaths(cwd, ["ok.ts", "../../../etc/passwd"]));
+});
+
+test("detectTool finds tools on PATH (not just local bin)", () => {
+	// `node` is on PATH in any sane environment; `ls` is a coreutil.
+	// A made-up tool that doesn't exist anywhere returns false.
+	assert.equal(detectTool("node", "/nonexistent-cwd-no-bin"), true);
+	assert.equal(detectTool("ls", "/nonexistent-cwd-no-bin"), true);
+	assert.equal(detectTool("definitely-not-a-real-tool-xyz123", "/nonexistent-cwd-no-bin"), false);
+});
+
+test("TriageStore persists marks to disk and reloads them", () => {
+	const tmp = `/tmp/rap-triage-${Date.now()}.json`;
+	try {
+		const k = diagnosticKey("a.ts", 5, "TS1234: bad");
+		const s1 = new TriageStore({ filePath: tmp });
+		s1.mark("falsePositive", k, "not a real issue");
+		assert.equal(s1.size(), 1);
+
+		// A fresh store pointed at the same file must reload the mark.
+		const s2 = new TriageStore({ filePath: tmp });
+		assert.equal(s2.size(), 1);
+		assert.equal(s2.get(k)?.mark, "falsePositive");
+		assert.equal(s2.isActive(k), false);
+
+		// attachFilePath is idempotent and loads on first attach.
+		const tmp2 = `/tmp/rap-triage2-${Date.now()}.json`;
+		const s3 = new TriageStore();
+		s3.attachFilePath(tmp); // loads existing
+		assert.equal(s3.size(), 1);
+		s3.attachFilePath(tmp); // idempotent: no reload
+		const s4 = new TriageStore();
+		s4.attachFilePath(tmp2); // missing file: starts empty
+		assert.equal(s4.size(), 0);
+	} finally {
+		try { require("fs").unlinkSync(tmp); } catch {}
+	}
 });

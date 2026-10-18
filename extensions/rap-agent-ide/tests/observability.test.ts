@@ -71,3 +71,18 @@ test("captureCpuProfile writes a .cpuprofile and reports hot functions", async (
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("captureCpuProfile does not throw on a fast/trivial script", async () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-ide-obs-"));
+	try {
+		// A trivial script exits almost immediately — previously this made
+		// Profiler.stop reject (closed connection) and the whole capture threw.
+		const res = await captureCpuProfile("1+1", { cwd: dir, durationMs: 1000, outFile: "fast.cpuprofile" });
+		assert.ok(fs.existsSync(res.file));
+		assert.equal(typeof res.sampleCount, "number");
+		// Either it captured samples or it flagged an early exit — both are valid.
+		assert.ok(res.sampleCount > 0 || res.earlyExit === true, "fast script should not error the capture");
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});

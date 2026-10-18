@@ -5,9 +5,13 @@ import {
 	extractTodoItems,
 	extractDoneSteps,
 	markCompletedSteps,
+	resolvePlanModeTools,
+	filterRegisteredTools,
 	type TodoItem,
 } from "../utils.ts";
 import { isSafeCommand } from "../../_shared/bash-allowlist.ts";
+
+const PLAN_MODE_TOOLS_PROXY = ["read", "bash", "grep", "find", "ls", "questionnaire"];
 
 test("cleanStepText strips emphasis and leading verbs", () => {
 	assert.equal(cleanStepText("**Run** the tests"), "Tests");
@@ -87,4 +91,19 @@ test("SAFETY: edit and write are in the disabled set", async () => {
 	// behavior is covered by the integration test (tool_call handler + setActiveTools).
 	// We re-assert the shared classifier that the handler relies on.
 	assert.equal(isSafeCommand("echo bypass | tee /etc/passwd"), false);
+});
+
+test("resolvePlanModeTools drops unregistered tool names", () => {
+	const registered = new Set(["read", "bash", "grep", "edit"]);
+	const disabled = new Set(["edit", "write"]);
+	// 'find', 'ls', 'questionnaire' are NOT in registered → filtered out.
+	const plan = resolvePlanModeTools(["read", "write", "customTool"], PLAN_MODE_TOOLS_PROXY, registered, disabled);
+	// 'write' disabled+not-registered → dropped; 'customTool' not registered → dropped.
+	assert.deepEqual([...new Set(plan)].sort(), ["bash", "grep", "read"]);
+});
+
+test("filterRegisteredTools keeps only registered names", () => {
+	const registered = new Set(["read", "bash"]);
+	const out = filterRegisteredTools(["read", "edit", "bash", "ls"], registered);
+	assert.deepEqual(out, ["read", "bash"]);
 });

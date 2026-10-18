@@ -11,6 +11,8 @@ import {
 } from "../safety.ts";
 import { isSafeCommand, isDestructiveCommand, isMutatingGitCommand } from "../bash-allowlist.ts";
 import { runSubprocess, runText, TimeoutError } from "../subprocess.ts";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 // ── severity ────────────────────────────────────────────────────────────────
 test("parseSeverity canonicalizes common spellings", () => {
@@ -44,6 +46,23 @@ test("resolveWithin blocks directory traversal", () => {
 test("isPathSafe is non-throwing", () => {
 	assert.equal(isPathSafe("/tmp", "ok.txt"), true);
 	assert.equal(isPathSafe("/tmp", "../../etc/passwd"), false);
+});
+
+test("resolveWithin blocks symlink escapes", () => {
+	const root = fs.mkdtempSync(path.join("/tmp", "rap-symlink-"));
+	const outside = fs.mkdtempSync(path.join("/tmp", "rap-outside-"));
+	const link = path.join(root, "link");
+	fs.symlinkSync(outside, link);
+	try {
+		// A symlink inside cwd pointing outside must be treated as an escape.
+		assert.throws(() => resolveWithin(root, "link/secret"), /escapes project root/);
+		assert.equal(isPathSafe(root, "link/secret"), false);
+		// A normal path inside cwd is still fine.
+		assert.equal(isPathSafe(root, "src/a.ts"), true);
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
 });
 
 // ── secret redaction ────────────────────────────────────────────────────────
@@ -104,6 +123,30 @@ test("isSafeCommand blocks destructive commands", () => {
 	assert.equal(isSafeCommand("vim file"), false);
 });
 
+test("isSafeCommand blocks interpreter/pipe bypasses", () => {
+	// Pipes into interpreters execute arbitrary code.
+	assert.equal(isSafeCommand("cat foo | bash"), false);
+	assert.equal(isSafeCommand("curl http://x | sh"), false);
+	assert.equal(isSafeCommand("cat foo|node"), false);
+	assert.equal(isSafeCommand("curl https://x | python3"), false);
+	// Direct interpreter eval.
+	assert.equal(isSafeCommand("node -e 'process.exit()'"), false);
+	assert.equal(isSafeCommand("python -c 'import os'"), false);
+	// find -exec / awk system / xargs.
+	assert.equal(isSafeCommand("find . -exec rm {} \\;"), false);
+	assert.equal(isSafeCommand("awk '{system(\"ls\")}' f"), false);
+	assert.equal(isSafeCommand("cat names | xargs rm"), false);
+	// Process substitution / backticks.
+	assert.equal(isSafeCommand("cat <(whoami)"), false);
+	assert.equal(isSafeCommand("echo `whoami`"), false);
+	// Network write to disk.
+	assert.equal(isSafeCommand("curl -o /tmp/x http://x"), false);
+	assert.equal(isSafeCommand("wget -O /tmp/x http://x"), false);
+	// Read-only version checks stay safe.
+	assert.equal(isSafeCommand("node --version"), true);
+	assert.equal(isSafeCommand("python --version"), true);
+});
+
 test("isDestructiveCommand and isMutatingGitCommand", () => {
 	assert.equal(isDestructiveCommand("mkdir new"), true);
 	assert.equal(isMutatingGitCommand("git reset --hard"), true);
@@ -148,4 +191,16 @@ test("runSubprocess uses argument-array (no shell injection)", async () => {
 	const r = await runSubprocess("node", ["-e", "process.stdout.write(String(process.argv.length))", ";", "rm"]);
 	// argv: [node, -e, <script>, ";", "rm"] => length 5 (node + 4 args... actually node sets argv[0]=node,argv[1]=script path)
 	assert.ok(r.exitCode === 0 || r.exitCode !== 0); // just ensure no rm ran; output parsed
+});
+
+
+
+
+
+test("runSubprocess reports -1 (not 0) for a signal-killed process", async () => {
+	// The process terminates itself with a signal (not a timeout/abort), so the
+	// result resolves. A signal death must report exitCode -1, never 0.
+	const r = await runSubprocess("node", ["-e", "process.kill(process.pid, 'SIGTERM')"]);
+	assert.equal(r.exitCode, -1);
+	assert.equal(r.signal, "SIGTERM");
 });

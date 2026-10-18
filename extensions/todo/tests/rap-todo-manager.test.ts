@@ -115,3 +115,30 @@ test("planTasks rejects duplicate titles, unknown deps, and cycles", () => {
 	assert.ok(!cycle.ok);
 	assert.match((cycle as { error: string }).error, /Circular/);
 });
+
+// ── corrupt data: never overwrite the original file ─────────────────────────
+test("corrupt data: manager isCorrupt and mutations refuse without saving", () => {
+	let saveCalls = 0;
+	const corruptStorage: RapTodoStorage = {
+		pathFor: () => "<mem>/todos.json",
+		load: () => ({ ok: false, error: "Corrupt todos.json (invalid JSON): oops", rawPath: "<mem>/todos.json" }),
+		save: () => {
+			saveCalls++;
+			return { ok: true };
+		},
+	};
+	const m = RapTodoManager.load(corruptStorage, "/proj");
+	assert.equal(m.isCorrupt(), true);
+	assert.ok(m.corruptError()?.includes("invalid JSON"));
+
+	// Every mutation must refuse and must NOT call save (would overwrite the file).
+	const r = m.add("do something", "manual");
+	assert.equal(r.ok, false);
+	assert.match((r as { error: string }).error, /corrupt/i);
+	assert.equal(saveCalls, 0, "save must not be called on corrupt data");
+
+	// planTasks and check also refuse.
+	assert.equal(m.planTasks([{ title: "A" }]).ok, false);
+	assert.equal(m.check("1").ok, false);
+	assert.equal(saveCalls, 0);
+});

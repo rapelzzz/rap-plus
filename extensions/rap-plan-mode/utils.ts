@@ -79,3 +79,29 @@ export function markCompletedSteps(text: string, items: TodoItem[]): number {
 	}
 	return doneSteps.length;
 }
+
+/** Filter a list of tool names to only those actually registered with Pi.
+ * Pure (takes the registered set as input) so plan-mode tool resolution can be
+ * unit-tested without a full Pi mock. Prevents activating tool names that
+ * don't exist in this build (e.g. `find`/`ls`/`questionnaire`). */
+export function filterRegisteredTools(
+	names: readonly string[],
+	registered: ReadonlySet<string>,
+): string[] {
+	return names.filter((n) => registered.has(n));
+}
+
+/** Resolve the plan-mode active tool set: keep active tools not in the
+ * `disabled` set (and registered), plus managed read-only tools (registered).
+ * Order is preserved, duplicates removed. */
+export function resolvePlanModeTools(
+	active: readonly string[],
+	managed: readonly string[],
+	registered: ReadonlySet<string>,
+	disabled: ReadonlySet<string>,
+): string[] {
+	return [...new Set([
+		...active.filter((n) => !disabled.has(n) && registered.has(n)),
+		...filterRegisteredTools(managed, registered),
+	])];
+}

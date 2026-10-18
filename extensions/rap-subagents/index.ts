@@ -37,6 +37,15 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
+
+/** Maximum task payload size passed on the command line (well under ARG_MAX). */
+export const TASK_ARG_MAX = 64 * 1024;
+
+/** Cap a task string to TASK_ARG_MAX, appending a truncation notice if cut. */
+export function capTaskArg(task: string): string {
+	if (task.length <= TASK_ARG_MAX) return task;
+	return task.slice(0, TASK_ARG_MAX) + "\n[task truncated: exceeded 64KB command-line limit]";
+}
 const COLLAPSED_ITEM_COUNT = 10;
 const PER_TASK_OUTPUT_CAP = 50 * 1024;
 /** Maximum nested subagent depth across process boundaries. */
@@ -328,18 +337,20 @@ async function runSingleAgent(
 			args.push("--append-system-prompt", tmpPromptPath);
 		}
 
-		args.push(`Task: ${task}`);
+		const taskArg = capTaskArg(task);
+		args.push(`Task: ${taskArg}`);
 		let wasAborted = false;
 
 		const exitCode = await new Promise<number>((resolve) => {
-			const invocation = getPiInvocation(args);
-			const proc = spawn(invocation.command, invocation.args, {
-				cwd: cwd ?? defaultCwd,
-				env: childEnv,
-				shell: false,
-				stdio: ["ignore", "pipe", "pipe"],
-			});
-			let buffer = "";
+		const invocation = getPiInvocation(args);
+		const proc = spawn(invocation.command, invocation.args, {
+			cwd: cwd ?? defaultCwd,
+			env: childEnv,
+			shell: false,
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		let buffer = "";
+		let exited = false; // process actually exited (proc.killed is true on kill(), not on exit)
 
 			const processLine = (line: string) => {
 				if (!line.trim()) return;
@@ -390,18 +401,39 @@ async function runSingleAgent(
 			});
 
 			proc.on("close", (code) => {
+				exited = true;
 				if (buffer.trim()) processLine(buffer);
 				resolve(code ?? 0);
 			});
 
-			proc.on("error", () => resolve(1));
+			// Surface spawn failures (e.g. pi binary missing/ENOENT) instead of
+			// silently reporting exit 1 with no diagnostic.
+			proc.on("error", (err) => {
+				exited = true;
+				const msg = `Failed to spawn subagent: ${err.message}`;
+				currentResult.errorMessage = msg;
+				currentResult.stderr += `\n[spawn error: ${err.message}]`;
+				resolve(1);
+			});
 
 			if (signal) {
 				const killProc = () => {
 					wasAborted = true;
-					proc.kill("SIGTERM");
+					try {
+						proc.kill("SIGTERM");
+					} catch {
+						/* already gone */
+					}
 					setTimeout(() => {
-						if (!proc.killed) proc.kill("SIGKILL");
+						// proc.killed is true the instant kill() is called, so use the
+					// `exited` flag to detect actual exit before escalating.
+						if (!exited) {
+							try {
+								proc.kill("SIGKILL");
+							} catch {
+								/* already gone */
+							}
+						}
 					}, 5000).unref();
 				};
 				if (signal.aborted) killProc();
@@ -410,7 +442,12 @@ async function runSingleAgent(
 		});
 
 		currentResult.exitCode = exitCode;
-		if (wasAborted) throw new Error("Subagent was aborted");
+		if (wasAborted) {
+			// Don't throw — surface an aborted result so the caller can report
+			// isError cleanly instead of propagating an exception.
+			currentResult.stopReason = "aborted";
+			currentResult.errorMessage = currentResult.errorMessage || "Subagent was aborted";
+		}
 		return currentResult;
 	} finally {
 		if (tmpPromptPath)
@@ -594,6 +631,7 @@ export default function rapSubagents(pi: ExtensionAPI) {
 					};
 
 				const allResults: SingleResult[] = new Array(params.tasks.length);
+				const startedIndices = new Set<number>();
 				for (let i = 0; i < params.tasks.length; i++) {
 					allResults[i] = {
 						agent: params.tasks[i].agent,
@@ -608,16 +646,20 @@ export default function rapSubagents(pi: ExtensionAPI) {
 
 				const emitParallelUpdate = () => {
 					if (onUpdate) {
-						const running = allResults.filter((r) => r.exitCode === -1).length;
+						const running = allResults.filter((_, i) => startedIndices.has(i) && allResults[i].exitCode === -1).length;
 						const done = allResults.filter((r) => r.exitCode !== -1).length;
+						const pending = allResults.length - running - done;
+						const pendingTxt = pending > 0 ? `, ${pending} queued` : "";
 						onUpdate({
-							content: [{ type: "text", text: `Parallel: ${done}/${allResults.length} done, ${running} running...` }],
+							content: [{ type: "text", text: `Parallel: ${done}/${allResults.length} done, ${running} running${pendingTxt}...` }],
 							details: makeDetails("parallel")([...allResults]),
 						});
 					}
 				};
 
 				const results = await mapWithConcurrencyLimit(params.tasks, MAX_CONCURRENCY, async (t, index) => {
+					startedIndices.add(index);
+					emitParallelUpdate();
 					const result = await runSingleAgent(
 						ctx.cwd, dispatchDefaults, agents, t.agent, t.task, t.cwd, undefined, signal,
 						(partial) => {

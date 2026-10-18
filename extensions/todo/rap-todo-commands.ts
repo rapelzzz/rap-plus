@@ -158,6 +158,17 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
 
       const session = deps.ensureSession(ctx.cwd);
 
+      // Corrupt data is never silently destroyed: refuse mutations (and any
+      // operation) so the original file is preserved for recovery.
+      if (session.manager.isCorrupt()) {
+        notifyResult(
+          ctx,
+          false,
+          `Todo data is corrupt and was not modified. ${(session.manager.corruptError() ?? "").trim()}`,
+        );
+        return;
+      }
+
       // No subcommand: refresh/show the compact panel.
       if (sub === "" ) {
         if (ctx.mode === "tui" && ctx.hasUI) {
@@ -191,7 +202,7 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
 
         case "add": {
           if (rest.length === 0) {
-            notifyResult(ctx, false, "Usage: /todo add <task>");
+            notifyResult(ctx, false, "Usage: /rap-todo add <task>");
             return;
           }
           const res = session.manager.add(rest, "manual");
@@ -207,7 +218,7 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
 
         case "check": {
           if (rest.length === 0) {
-            notifyResult(ctx, false, "Usage: /todo check <id>");
+            notifyResult(ctx, false, "Usage: /rap-todo check <id>");
             return;
           }
           const res = session.manager.check(rest);
@@ -222,7 +233,7 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
 
         case "uncheck": {
           if (rest.length === 0) {
-            notifyResult(ctx, false, "Usage: /todo uncheck <id>");
+            notifyResult(ctx, false, "Usage: /rap-todo uncheck <id>");
             return;
           }
           const res = session.manager.uncheck(rest);
@@ -240,7 +251,7 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
           const id = sp === -1 ? rest : rest.slice(0, sp);
           const title = sp === -1 ? "" : rest.slice(sp + 1).trim();
           if (!id || title.length === 0) {
-            notifyResult(ctx, false, "Usage: /todo edit <id> <new title>");
+            notifyResult(ctx, false, "Usage: /rap-todo edit <id> <new title>");
             return;
           }
           const res = session.manager.edit(id, title);
@@ -255,7 +266,7 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
 
         case "remove": {
           if (rest.length === 0) {
-            notifyResult(ctx, false, "Usage: /todo remove <id>");
+            notifyResult(ctx, false, "Usage: /rap-todo remove <id>");
             return;
           }
           // Warn about dependents and confirm when present.

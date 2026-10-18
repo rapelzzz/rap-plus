@@ -5,7 +5,8 @@
  * stripping. Path validation, secret redaction, and severity helpers.
  */
 
-import { resolve, relative, sep, isAbsolute } from "node:path";
+import { resolve, relative, sep, isAbsolute, dirname, basename, join } from "node:path";
+import { realpathSync } from "node:fs";
 
 /** Review/severity ordering from most to least severe. */
 export const SEVERITY_LEVELS = ["critical", "high", "medium", "info"] as const;
@@ -27,22 +28,43 @@ export function severityRank(s: Severity): number {
 }
 
 /**
+ * Resolve the real (symlink-free) path of `p`. If `p` does not exist yet
+ * (e.g. a write target about to be created), resolve its parent directory
+ * and re-append the basename so a symlinked parent is still caught.
+ */
+function realpathSafe(p: string): string {
+	try {
+		return realpathSync(p);
+	} catch {
+		try {
+			return join(realpathSync(dirname(p)), basename(p));
+		} catch {
+			return p;
+		}
+	}
+}
+
+/**
  * Resolve `target` against `cwd` and verify the result stays inside `cwd`.
- * Blocks directory traversal (`..`) and absolute escapes outside the root.
+ * Blocks directory traversal (`..`) and absolute escapes outside the root,
+ * AND symlink escapes (a symlink inside `cwd` pointing outside). Symlinks are
+ * resolved via realpath so the containment check uses real locations.
  * Returns the absolute, normalized path or throws.
  */
 export function resolveWithin(cwd: string, target: string): string {
 	if (!target || typeof target !== "string") {
 		throw new Error("Path must be a non-empty string");
 	}
+	const realCwd = realpathSafe(cwd);
 	const abs = resolve(cwd, target);
-	const rel = relative(cwd, abs);
+	const realAbs = realpathSafe(abs);
+	const rel = relative(realCwd, realAbs);
 	// A relative path of ".." or starting with ".." escapes cwd. On Windows a
 	// different drive letter makes `rel` absolute and not start with "..".
-	if (rel === ".." || rel.startsWith(`..${sep}`) || (rel && isAbsolute(rel) && rel !== abs)) {
+	if (rel === ".." || rel.startsWith(`..${sep}`) || (rel && isAbsolute(rel) && rel !== realAbs)) {
 		throw new Error(`Path escapes project root: ${target}`);
 	}
-	return abs;
+	return realAbs;
 }
 
 /** True when `target` resolves inside `cwd` (non-throwing variant of resolveWithin). */

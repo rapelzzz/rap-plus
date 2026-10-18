@@ -7,6 +7,8 @@ import {
 	truncateParallelOutput,
 	getFinalOutput,
 	isFailedResult,
+	capTaskArg,
+	TASK_ARG_MAX,
 	type SingleResult,
 } from "../index.ts";
 
@@ -99,4 +101,16 @@ test("isFailedResult flags non-zero exit, error, aborted", () => {
 	const e1 = base(); e1.exitCode = 1; assert.equal(isFailedResult(e1), true);
 	const e2 = base(); e2.stopReason = "error"; assert.equal(isFailedResult(e2), true);
 	const e3 = base(); e3.stopReason = "aborted"; assert.equal(isFailedResult(e3), true);
+});
+
+test("capTaskArg truncates oversized tasks with a notice", () => {
+	// A normal task passes through unchanged.
+	assert.equal(capTaskArg("do thing"), "do thing");
+	// An oversized task is capped and marked.
+	const huge = "x".repeat(TASK_ARG_MAX + 1000);
+	const capped = capTaskArg(huge);
+	assert.ok(capped.length < huge.length);
+	assert.match(capped, /\[task truncated/);
+	// The boundary itself is the cutoff: exactly TASK_ARG_MAX stays unchanged.
+	assert.equal(capTaskArg("x".repeat(TASK_ARG_MAX)).length, TASK_ARG_MAX);
 });

@@ -81,6 +81,7 @@ export function runSubprocess(
 		let stderr = "";
 		let timedOut = false;
 		let settled = false;
+		let exited = false; // set when the process has actually exited (distinct from proc.killed)
 
 		const clean = redact ? (s: string) => redactSecrets(s) : (s: string) => s;
 
@@ -102,12 +103,16 @@ export function runSubprocess(
 		const finish = (exitCode: number, sig: NodeJS.Signals | null) => {
 			if (settled) return;
 			settled = true;
+			exited = true;
 			clear();
 			const wallMs = Date.now() - start;
+			// A signal-killed process (close gives code=null→0, sig set) must not
+			// report exit 0; use -1 so callers don't mistake a kill for success.
+			const reportedExit = sig != null ? -1 : exitCode;
 			const result: RunResult = {
 				command,
 				args,
-				exitCode,
+				exitCode: reportedExit,
 				stdout: truncateToBytes(stdout, maxOutputBytes),
 				stderr: truncateToBytes(stderr, maxOutputBytes),
 				timedOut,
@@ -132,10 +137,23 @@ export function runSubprocess(
 		};
 
 		const killWithGrace = () => {
-			if (proc.killed) return;
-			proc.kill("SIGTERM");
+			if (exited) return;
+			try {
+				proc.kill("SIGTERM");
+			} catch {
+				/* process may have just exited */
+			}
 			setTimeout(() => {
-				if (!proc.killed) proc.kill("SIGKILL");
+				// proc.killed is true the moment kill() is called, so it can't be used
+				// to detect actual exit. Use our own `exited` flag instead: if the
+				// process hasn't closed by the grace period, escalate to SIGKILL.
+				if (!exited) {
+					try {
+						proc.kill("SIGKILL");
+					} catch {
+						/* already gone */
+					}
+				}
 			}, graceMs).unref();
 		};
 
