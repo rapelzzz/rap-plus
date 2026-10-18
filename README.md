@@ -1,4 +1,8 @@
-# rap-plus
+<p align="center">
+  <img src="assets/rap-plus-logo.png" alt="rap-plus logo" width="180">
+</p>
+
+<h1 align="center">rap-plus</h1>
 
 A [Pi](https://pi.dev) package — ten extensions, a theme, and tooling for the RAP workflow.
 
