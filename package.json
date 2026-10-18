@@ -28,7 +28,8 @@
       "./extensions/rap-code-review/index.ts",
       "./extensions/rap-lens/index.ts",
       "./extensions/rap-debug-mode/index.ts",
-      "./extensions/rap-agent-ide/index.ts"
+      "./extensions/rap-agent-ide/index.ts",
+      "./extensions/rap-loop-inspector.ts"
     ],
     "themes": [
       "./themes/*.json"
