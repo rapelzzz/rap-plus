@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "description": "RAP+ — Pi extensions & theme pack (bluemon studio, todo system, widget renderer, web search).",
   "type": "module",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test 'extensions/**/*.test.ts'",
@@ -44,5 +46,11 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "@ast-grep/cli@0.51.0": true
+  },
+  "optionalDependencies": {
+    "@ast-grep/cli": "^0.51.0"
   }
 }

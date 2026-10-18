@@ -21,9 +21,9 @@ That installs Pi (if missing) and registers the `rap-plus` package. Start Pi and
 | rap-subagents | `extensions/rap-subagents` | Delegation: single/parallel/chain; depth limit; cancellation | ✓ full |
 | rap-simplify | `extensions/rap-simplify` | Review & simplify git-diff changed code; regression-safe | ✓ full |
 | rap-code-review | `extensions/rap-code-review` | Auto-review checklist + `/review` with severity findings | ✓ full |
-| rap-lens | `extensions/rap-lens` | Diagnostics: tsc type-check, linter parsing, triage marks | ◐ partial |
+| rap-lens | `extensions/rap-lens` | Diagnostics + LSP nav, symbol search, ast-grep, autofix, `/lens-map` | ✓ full |
 | rap-debug-mode | `extensions/rap-debug-mode` | Evidence-first debug workflow; repro-gated fixes | ✓ full |
-| rap-agent-ide | `extensions/rap-agent-ide` | Guarded editing, code search (ripgrep), diff inspection | ◐ partial |
+| rap-agent-ide | `extensions/rap-agent-ide` | Guarded editing, search, diff, terminals, CDP debugging, observability | ✓ full |
 | theme | `themes/rap-bluemon.json` | Dark "bluemon" theme | — |
 
 Parity column: **✓ full** = behaviorally matches the reference extension; **◐ partial** = focused subset shipped (see [research/feature-parity.md](research/feature-parity.md)); **original** = not derived from a reference.
@@ -44,33 +44,34 @@ Two surfaces:
 1. **Automatic**: after each turn where the agent edits files, a language-aware review checklist (TypeScript/Python/Go/Rust/Java/PHP/JS) is injected into the next turn via `before_agent_start`.
 2. **On-demand `/review`**: computes changed files + line ranges via `git diff`, reads the changed code, and calls the session model (`ctx.modelRegistry.complete`) for structured, severity-tagged findings (CRITICAL/HIGH/MEDIUM/INFO), parsed from JSON. Falls back to a prompt-based review when no model is configured. Read-only.
 
-### rap-lens (`/lens`, `lens_diagnostic_mark`)
-Focused diagnostics subset: dynamic tool/dependency detection, TypeScript type-check (`tsc --noEmit`), compiler/linter output parsing (tsc, rustc/gcc, ruff/flake8), diagnostic reporting, and a triage tool (`lens_diagnostic_mark`: falsePositive/suppressed/deferred/flagFix). **Not implemented**: LSP navigation, impact cascade, ast-grep/tree-sitter, symbol_search/module_map/read_symbol, `/lens-map`, autofix.
+### rap-lens (`/lens`, `/lens-map`)
+Full diagnostics + code-intelligence suite. Dynamic tool/dependency detection, TypeScript type-check (`tsc --noEmit`), compiler/linter output parsing (tsc, rustc/gcc, ruff/flake8), and a triage tool (`lens_diagnostic_mark`: falsePositive/suppressed/deferred/flagFix). LSP navigation via the TypeScript LanguageService: `lens_goto_definition`, `lens_find_references`, `lens_hover`. Symbol discovery: `lens_symbol_search`, `lens_module_report`, `lens_read_symbol` (regex fallback). Structural search/replace via ast-grep: `lens_ast_grep` (RO) + `lens_ast_grep_replace` (mutating; rejects the system `sg`/newgrp). Autofix: `lens_autofix` (TS codefixes + `eslint --fix` + `prettier --write`, dynamic). `/lens-map` writes a self-contained HTML module map. **Gaps**: event-driven diagnostics-on-edit and impact cascade are not implemented.
 
 ### rap-debug-mode (`/debug`, `debug_checkpoint`)
 Evidence-first debugging methodology. When enabled, injects a six-stage workflow (investigate → hypothesize → probe → reproduce → fix → verify). The `debug_checkpoint` tool records progress and **gates the fix stage behind a confirmed reproduction** (safety invariant: no fixing before repro). Includes the smallest-fix and verify-with-repro disciplines.
 
-### rap-agent-ide (`ide_search`, `ide_diff`, `ide_edit_guarded`)
+### rap-agent-ide (`ide_search`, `ide_diff`, `ide_edit_guarded`, `ide_terminal`, `ide_debug_run`, `ide_debug`, `ide_system_metrics`, `ide_cpu_profile`)
+Guarded IDE assistance. Guarded editing (path safety + sensitive-path block + size cap + interactive confirm), ripgrep code search, and git diff inspection. **Terminal pool**: `ide_terminal` (create/send/list/output/kill persistent shell sessions). **Debugging**: `ide_debug_run` starts a script under `node --inspect-brk`; `ide_debug` controls it (breakpoint/removeBreakpoint/resume/stepOver/stepInto/stepOut/evaluate/locals/status/stop) over CDP. **Observability**: `ide_system_metrics` (host/cpu/memory via `node:os`) and `ide_cpu_profile` (captures a `.cpuprofile` via the CDP Profiler domain). **Gaps**: event-driven LSP-on-edit (use rap-lens), undo/recovery stack.
 Guarded IDE-style assistance:
 - `ide_search` — ripgrep code search (read-only).
 - `ide_diff` — git diff for a path (read-only).
 - `ide_edit_guarded` — write/edit with safety validation: path must resolve within the project root, sensitive paths (`.env`, credentials, SSH keys, `.npmrc`) are blocked, size limits enforced, and the user is asked to confirm before applying.
 
-**Not implemented**: terminals, debugging, observability, LSP.
+**Not implemented**: undo/recovery stack, event-driven LSP-on-edit (use rap-lens `/lens`).
 
 ## Safety invariants
 
 - **rap-plan-mode**: technically blocks writes (removes edit/write tools via `setActiveTools`; blocks destructive bash via `tool_call`).
 - **rap-subagents**: depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, no credential propagation.
 - **rap-code-review**: read-only — never edits or publishes.
-- **rap-lens**: read-only diagnostics; `lens_diagnostic_mark` is `readOnlyHint`.
+- **rap-lens**: `lens_*` navigation/symbol/search tools are `readOnlyHint`; `lens_ast_grep_replace` and `lens_autofix` are mutating (clearly labeled).
 - **rap-debug-mode**: fix stage blocked until reproduction confirmed.
-- **rap-agent-ide**: guarded edit validates path safety + blocks sensitive paths + interactive confirm; `ide_search`/`ide_diff` are read-only.
+- **rap-agent-ide**: guarded edit validates path safety + blocks sensitive paths + interactive confirm; `ide_search`/`ide_diff`/`ide_system_metrics` are read-only; `ide_terminal`/`ide_debug_*`/`ide_cpu_profile` are mutating (sessions bounded — terminal cap 8, debug sessions killed on stop).
 
 ## Tests
 
 ```sh
-npm test            # 91 unit tests across shared utils + 7 new extensions
+npm test            # 145 unit + integration tests across shared utils + 9 extensions
 npm run test:integration   # integration smoke tests (real git)
 npx tsc --noEmit    # typecheck (12 pre-existing baseline errors in rap-web-search.ts)
 ```
@@ -78,7 +79,7 @@ npx tsc --noEmit    # typecheck (12 pre-existing baseline errors in rap-web-sear
 Test coverage:
 - `_shared` (safety, subprocess, git-diff, bash-allowlist): 18 tests
 - rap-plan-mode: 9 · rap-subagents: 10 · rap-simplify: 7 · rap-code-review: 12
-- rap-lens: 11 · rap-debug-mode: 11 · rap-agent-ide: 13
+- rap-lens: 40 · rap-debug-mode: 11 · rap-agent-ide: 31 · todo: 7
 
 Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
 

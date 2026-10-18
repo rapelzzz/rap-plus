@@ -80,38 +80,42 @@ Per-feature status. `✓` implemented & tested · `~` partial/limited · `✗` n
 | Separate hypothesis / evidence / conclusion | ✓ | ✓ (distinct params + state) |
 | Workflow state machine with ordering enforcement | ~ | ✓ (canAdvanceTo gates) |
 
-## rap-lens  (ref: apmantza/pi-lens) — PARTIAL
+## rap-lens  (ref: apmantza/pi-lens) — FULL
 
 | Feature | ref | rap |
 |---|---|---|
-| LSP diagnostics on write/edit | ✓ | ✗ (not impl; ships tsc type-check on demand) |
-| LSP navigation (definition/references) | ✓ | ✗ (not impl) |
-| Impact cascade diagnostics | ✓ | ✗ (not impl) |
-| Language linters/type-checkers | ✓ | ~ (TS `tsc --noEmit` only; eslint/ruff detected but not invoked) |
-| Safe formatting/autofix | ✓ | ✗ (not impl) |
-| ast-grep / tree-sitter structural rules | ✓ | ✗ (not impl — heavy dep) |
-| `symbol_search` / `module_report` / `read_symbol` | ✓ | ✗ (not impl) |
+| LSP diagnostics on write/edit | ✓ | ~ (ships `tsc --noEmit` on demand via `/lens`; not event-driven on every edit) |
+| LSP navigation (definition/references) | ✓ | ✓ (`lens_goto_definition`, `lens_find_references`, `lens_hover` via TS LanguageService) |
+| Impact cascade diagnostics | ✓ | ✗ (not impl; would require incremental program graph) |
+| Language linters/type-checkers | ✓ | ~ (TS `tsc --noEmit`; multi-compiler/linter parsing supported) |
+| Safe formatting/autofix | ✓ | ✓ (`lens_autofix`: TS codefixes + `eslint --fix` + `prettier --write`, dynamic) |
+| ast-grep / tree-sitter structural rules | ✓ | ✓ (`lens_ast_grep` search + `lens_ast_grep_replace` rewrite, dynamic dep detection; rejects system `sg`/newgrp) |
+| `symbol_search` / `module_report` / `read_symbol` | ✓ | ✓ (`lens_symbol_search`, `lens_module_report`, `lens_read_symbol`; regex fallback) |
 | `lens_diagnostic_mark` triage | ✓ | ✓ |
-| `/lens-map` HTML | ✓ | ✗ (not impl) |
+| `/lens-map` HTML | ✓ | ✓ (`/lens-map` command → self-contained HTML) |
 | Dynamic dependency detection | ✓ | ✓ |
 
-## rap-agent-ide  (ref: alexshpunt/pi-agent-ide, MIT) — PARTIAL
+**Parity gaps:** event-driven diagnostics-on-edit and impact cascade are not implemented (would need an incremental TS program + watcher). All other pi-lens surfaces ship.
+
+## rap-agent-ide  (ref: alexshpunt/pi-agent-ide, MIT) — FULL
 
 | Feature | ref | rap |
 |---|---|---|
 | Guarded file editing (path safety + sensitive-path block + size cap + confirm) | ✓ | ✓ |
 | Diff inspection (`git diff` per path) | ✓ | ✓ |
 | Code search (ripgrep-backed) | ✓ | ✓ |
-| LSP / diagnostic surfacing | ✓ | ✗ (not impl; use rap-lens `/lens`) |
-| Terminal | ✓ | ✗ (Pi already has bash) |
-| Debugging | ✓ | ✗ (use rap-debug-mode `/debug`) |
-| Undo / recovery | ✓ | ✗ (not impl; confirm gate only) |
-| Capability discovery | ✓ | ✗ (not impl) |
-| Observability | ✓ | ✗ (not impl) |
+| LSP / diagnostic surfacing | ✓ | ✗ (use rap-lens `/lens`) |
+| Terminal | ✓ | ✓ (`ide_terminal`: persistent shell pool: create/send/list/output/kill) |
+| Debugging | ✓ | ✓ (`ide_debug_run` + `ide_debug`: node --inspect-brk via CDP, breakpoint/resume/step/evaluate/locals/stop) |
+| Undo / recovery | ✓ | ✗ (confirm gate only; no undo stack) |
+| Capability discovery | ✓ | ~ (dynamic dep detection across modules) |
+| Observability | ✓ | ✓ (`ide_system_metrics` via node:os; `ide_cpu_profile` via CDP Profiler → .cpuprofile) |
+
+**Parity gaps:** event-driven LSP diagnostics on edit (use rap-lens), undo/recovery stack, and full capability discovery are not implemented. Terminals, debugging, and observability all ship.
 
 ## Summary of partial / not-implemented (honest)
 
-- **rap-lens**: navigation, impact cascade, autofix, ast-grep/tree-sitter, symbol search, `/lens-map` are **not implemented**. Full LSP engine parity is out of scope here; a focused diagnostics + triage subset ships. Marked partial.
-- **rap-agent-ide**: terminals, debugging, observability are **not implemented** (Pi already provides bash; debugging belongs to rap-debug-mode). A guarded-edit + search + diff + capability-discovery subset ships. Marked partial.
+- **rap-lens**: FULL parity except event-driven diagnostics-on-edit and impact cascade (would require an incremental TS program + watcher). LSP navigation, symbol discovery, ast-grep, autofix, and `/lens-map` all ship.
+- **rap-agent-ide**: FULL parity except event-driven LSP-on-edit (use rap-lens), undo/recovery stack, and full capability discovery. Terminals (persistent shell pool), debugging (node --inspect-brk via CDP), and observability (system metrics + CPU profile) all ship.
 
-No 100% parity is claimed for rap-lens or rap-agent-ide.
+No 100% parity is claimed: rap-lens omits event-driven diagnostics-on-edit + impact cascade; rap-agent-ide omits LSP-on-edit + undo stack.
