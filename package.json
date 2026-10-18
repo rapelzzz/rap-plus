@@ -1,6 +1,7 @@
 {
   "name": "@rapelz/rap-plus",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "RAP+ — Pi extensions & theme pack (bluemon studio, todo system, widget renderer, web search).",
   "type": "module",
   "keywords": [
