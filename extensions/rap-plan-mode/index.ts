@@ -135,7 +135,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		handler: async (_args, ctx) => togglePlanMode(ctx),
 	});
 
-	pi.registerCommand("todos", {
+	pi.registerCommand("rap-todos", {
 		description: "Show current rap-plan-mode todo list",
 		handler: async (_args, ctx) => {
 			if (todoItems.length === 0) {

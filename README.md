@@ -15,7 +15,7 @@ That installs Pi (if missing) and registers the `rap-plus` package. Start Pi and
 | Extension | Path | Description | Parity |
 |---|---|---|---|
 | rap-bluemon | `extensions/rap-bluemon` | Neon studio UI: status bar, rain panel, usage analytics, trend chart | original |
-| todo | `extensions/todo` | RAP Todo panel, `/todo` commands, `rap_todo` tool, per-project persistence | original |
+| todo | `extensions/todo` | RAP Todo panel, `/rap-todo` commands, `rap_todo` tool, per-project persistence | original |
 | rap-web-search | `extensions/rap-web-search.ts` | Headless Playwright + DuckDuckGo `web_search` tool | original |
 | rap-plan-mode | `extensions/rap-plan-mode` | Read-only planning mode; blocks writes/destructive bash | ✓ full |
 | rap-subagents | `extensions/rap-subagents` | Delegation: single/parallel/chain; depth limit; cancellation | ✓ full |

@@ -147,7 +147,7 @@ function notifyResult(ctx: ExtensionCommandContext, ok: boolean, message: string
 }
 
 export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDeps): void {
-  pi.registerCommand("todo", {
+  pi.registerCommand("rap-todo", {
     description:
       "Rap Todo system. Subcommands: list, add <task>, check <id>, uncheck <id>, edit <id> <title>, remove <id>, resume, clear-completed, clear.",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
