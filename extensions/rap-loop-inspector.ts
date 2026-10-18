@@ -212,12 +212,11 @@ export default function rapLoopInspector(pi: ExtensionAPI): void {
     const data = asRecord(event);
     const toolCallId = typeof data.toolCallId === "string" ? data.toolCallId : "";
     const state = callsById.get(toolCallId);
-    const result = asRecord(data.result);
     const isError = data.isError === true;
     const resultFingerprint = hash(stableJson({
       isError,
       // Only a one-way fingerprint is sent; raw result text never leaves this process.
-      result: typeof result === "object" ? result : String(data.result ?? ""),
+      result: data.result ?? null,
     }));
     emit("tool_end", {
       toolCallId: toolCallId || undefined,
