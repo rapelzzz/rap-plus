@@ -35,6 +35,9 @@ have pi || die "Pi still not on PATH after install. Open a new shell and re-run.
 log "Pi detected: $(pi --version 2>/dev/null || echo 'version unknown')"
 
 # --- 2. install the rap-plus package ---------------------------------------
+# `pi install` clones the repo and runs `npm install` in it, which fires the
+# package.json `postinstall` hook (scripts/patch-pi-logo.sh) — that recolors
+# the Pi startup logo to match rap-bluemon automatically. No manual step here.
 log "Installing package: ${PKG_SOURCE}"
 pi install "${PKG_SOURCE}"
 

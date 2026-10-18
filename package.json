@@ -1,6 +1,5 @@
 {
-  "name": "rap-plus",
-  "private": true,
+  "name": "@rapelzzz/rap-plus",
   "version": "1.0.0",
   "description": "RAP+ — Pi extensions & theme pack (bluemon studio, todo system, widget renderer, web search).",
   "type": "module",
@@ -10,8 +9,18 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test 'extensions/**/*.test.ts'",
-    "test:integration": "node --test 'extensions/**/tests/integration*.test.ts'"
+    "test:integration": "node --test 'extensions/**/tests/integration*.test.ts'",
+    "postinstall": "sh scripts/patch-pi-logo.sh"
   },
+  "files": [
+    "extensions/",
+    "themes/",
+    "scripts/",
+    "assets/",
+    "tsconfig.json",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "homepage": "https://github.com/rapelzzz/rap-plus",
   "repository": {
     "type": "git",
