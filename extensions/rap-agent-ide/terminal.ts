@@ -106,6 +106,16 @@ export class TerminalPool {
 		const appendCapped = (buf: string, chunk: Buffer): string => truncateOutput(buf + chunk.toString("utf8"), maxBuffer);
 		proc.stdout.on("data", (chunk: Buffer) => { state.stdout = appendCapped(state.stdout, chunk); });
 		proc.stderr.on("data", (chunk: Buffer) => { state.stderr = appendCapped(state.stderr, chunk); });
+		// Child processes can exit between the alive check and stdin.write(). On
+		// POSIX, the resulting EPIPE is emitted asynchronously by the Writable;
+		// a surrounding try/catch cannot catch it. Observe stream errors so a
+		// dead shell never raises an uncaught exception in the host process.
+		proc.stdin.on("error", (error: NodeJS.ErrnoException) => {
+			state.alive = false;
+			if (error.code !== "EPIPE") {
+				state.stderr = appendCapped(state.stderr, Buffer.from(`terminal stdin error: ${error.message}\\n`));
+			}
+		});
 		proc.on("exit", (code) => {
 			state.alive = false;
 			state.exitCode = code;
@@ -128,9 +138,19 @@ export class TerminalPool {
 		const beforeOut = s.stdout.length;
 		const beforeErr = s.stderr.length;
 		s.lastCommand = command;
-		// Writing to a shell that has just exited (e.g. after `exit 0`) throws
-		// EPIPE on the stdin write. Treat that as the session dying mid-send:
-		// mark it dead and return captured output, rather than propagating EPIPE.
+		// Writing to a shell that has just exited can fail synchronously or
+		// asynchronously. The persistent stdin error listener above handles the
+		// asynchronous EPIPE path; this guard handles already-closed streams.
+		if (!s.proc.stdin.writable || s.proc.stdin.destroyed) {
+			s.alive = false;
+			return {
+				id,
+				stdout: s.stdout.slice(beforeOut),
+				stderr: s.stderr.slice(beforeErr),
+				exitCode: s.exitCode,
+				timedOut: true,
+			};
+		}
 		try {
 			s.proc.stdin.write(command + "\n");
 			s.proc.stdin.write(`printf '%s\\n' '${marker}'\n`);

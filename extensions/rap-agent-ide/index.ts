@@ -22,7 +22,7 @@
 import { Type } from "typebox";
 import * as fs from "node:fs/promises";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { isSensitivePath, relFrom, validateEdit, validateEditTarget } from "./guard.ts";
+import { isSensitivePath, relFrom, validateEdit, validateEditInputShape, validateEditTarget } from "./guard.ts";
 import { formatHits, runSearch } from "./search.ts";
 import { runSubprocess } from "../_shared/subprocess.ts";
 import { TerminalPool, formatSessionList } from "./terminal.ts";
@@ -32,6 +32,15 @@ import { collectSystemMetrics, formatSystemMetrics, captureCpuProfile } from "./
 export default function rapAgentIde(pi: ExtensionAPI): void {
 	const terminals = new TerminalPool();
 	const debugSessions = new Map<string, DebugSession>();
+
+	// Interactive processes must never outlive the session runtime that owns them.
+	pi.on("session_shutdown", async () => {
+		terminals.killAll();
+		await Promise.all([...debugSessions.values()].map(async (session) => {
+			try { await session.stop(); } catch { /* cleanup is best-effort and idempotent */ }
+		}));
+		debugSessions.clear();
+	});
 
 	pi.registerTool({
 		name: "ide_search",
@@ -94,22 +103,33 @@ export default function rapAgentIde(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: false },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const isEdit = params.old_text !== undefined && params.new_text !== undefined;
+			const inputShapeError = validateEditInputShape(params);
+			if (inputShapeError) {
+				return { content: [{ type: "text", text: `Blocked: ${inputShapeError}` }], details: undefined, isError: true };
+			}
+			const hasOldText = params.old_text !== undefined;
+			const hasNewText = params.new_text !== undefined;
+			const isEdit = hasOldText && hasNewText;
 			const guard = isEdit
-				? validateEdit(ctx.cwd, params.file_path, params.old_text ?? "", params.new_text ?? "")
+				? validateEdit(ctx.cwd, params.file_path, params.old_text!, params.new_text!)
 				: validateEditTarget(ctx.cwd, params.file_path, params.content ?? "");
 			if (!guard.ok) return { content: [{ type: "text", text: `Blocked: ${guard.reason}` }], details: undefined };
 			const abs = guard.absPath!;
-			if (ctx.ui?.confirm) {
-				const verb = isEdit ? "edit" : "write";
-				const ok = await ctx.ui.confirm("rap-agent-ide", `${verb} ${relFrom(ctx.cwd, abs)}?`);
-				if (!ok) return { content: [{ type: "text", text: "Edit cancelled by user." }], details: undefined };
+			// Approval is mandatory. Headless/no-UI execution fails closed.
+			if (!ctx.hasUI || !ctx.ui?.confirm) {
+				return { content: [{ type: "text", text: "Blocked: interactive confirmation is unavailable; no file was changed." }], details: undefined, isError: true };
 			}
+			const verb = isEdit ? "edit" : "write";
+			const ok = await ctx.ui.confirm("rap-agent-ide", `${verb} ${relFrom(ctx.cwd, abs)}?`);
+			if (!ok) return { content: [{ type: "text", text: "Edit cancelled by user." }], details: undefined };
 			try {
 				if (isEdit) {
 					const existing = await fs.readFile(abs, "utf8");
-					if (!existing.includes(params.old_text!)) {
-						return { content: [{ type: "text", text: "old_text not found in file; edit aborted (no changes)." }], details: undefined };
+					const occurrences = existing.split(params.old_text!).length - 1;
+					if (occurrences !== 1) {
+						return { content: [{ type: "text", text: occurrences === 0
+							? "old_text not found in file; edit aborted (no changes)."
+							: `old_text matched ${occurrences} times; provide a unique anchor (no changes made).` }], details: undefined };
 					}
 					await fs.writeFile(abs, existing.replace(params.old_text!, params.new_text!), "utf8");
 					return { content: [{ type: "text", text: `Edited ${relFrom(ctx.cwd, abs)}.` }], details: undefined };

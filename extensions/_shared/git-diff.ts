@@ -52,14 +52,25 @@ export function parseGitDiff(diff: string): ChangedFile[] {
 	return files.filter((f) => f.path && f.path !== "/dev/null");
 }
 
+/** Accept only branch-like refs; option-looking strings must never reach git as a revision. */
+export function isSafeDiffRef(ref: string): boolean {
+	if (!ref || ref.startsWith("-") || ref.startsWith("/") || ref.endsWith("/") || ref.endsWith(".") || ref.endsWith(".lock")) return false;
+	if (ref.includes("..") || ref.includes("@{") || ref.includes("//") || ref.includes("\\\\") || ref.includes(":")) return false;
+	if (ref.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) return false;
+	return /^[A-Za-z0-9._/-]+$/.test(ref);
+}
+
 /** Parse the `--staged / --ref=<branch> / files` option form. */
 export function parseDiffArgs(argv: string[]): DiffArgs {
 	const args: DiffArgs = { staged: false, ref: undefined, files: [] };
 	for (const tok of argv) {
 		if (tok === "--staged" || tok === "--cached") args.staged = true;
-		else if (tok.startsWith("--ref=")) args.ref = tok.slice("--ref=".length);
-		else if (tok.startsWith("--")) {
-			// unknown flag — ignore
+		else if (tok.startsWith("--ref=")) {
+			const ref = tok.slice("--ref=".length);
+			if (!isSafeDiffRef(ref)) throw new Error("Invalid --ref branch name; use a valid branch name without option prefixes.");
+			args.ref = ref;
+		} else if (tok.startsWith("--")) {
+			// Unknown options are ignored rather than forwarded to git.
 		} else args.files.push(tok);
 	}
 	return args;
@@ -67,10 +78,12 @@ export function parseDiffArgs(argv: string[]): DiffArgs {
 
 /** Build the `git diff` argument list for the given options (tight ranges via -U0). */
 export function buildDiffArgs(args: DiffArgs): string[] {
-	const out: string[] = [];
+	const out: string[] = ["--no-ext-diff", "--no-color", "-U0"];
 	if (args.staged) out.push("--cached");
-	if (args.ref) out.push(args.ref);
-	out.push("--no-color", "-U0");
+	if (args.ref) {
+		if (!isSafeDiffRef(args.ref)) throw new Error("Invalid --ref branch name.");
+		out.push(args.ref);
+	}
 	if (args.files.length > 0) {
 		out.push("--");
 		out.push(...args.files);

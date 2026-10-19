@@ -8,7 +8,6 @@ import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { Text } from "@earendil-works/pi-tui";
 import { readUsageHistory } from "./analytics/usage-history.ts";
 import { RapConfigManager } from "./core/config.ts";
-import { ensurePiLogoPatched } from "./core/logo-patch.ts";
 import { detectTerminalTheme } from "./core/terminal-theme.ts";
 import {
   createRapErrorSink,
@@ -1195,24 +1194,7 @@ export function registerRapBluemonExtension(
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    // Keep the Pi startup logo recolored across `pi update`s. Fire-and-forget on a
-    // later tick so file I/O never blocks session setup; never throws.
-    // See core/logo-patch.ts for the why/limitations.
-    setImmediate(() => {
-      try {
-        const r = ensurePiLogoPatched(VERSION, getAgentDir());
-        if (r.patched && ctx.hasUI) {
-          ctx.ui.notify(
-            "Rap+ recolored the Pi logo to match the theme. Restart Pi to see it.",
-            "info",
-          );
-        } else if (r.reason === "error" && ctx.hasUI) {
-          ctx.ui.notify(`Rap+ could not recolor the Pi logo: ${r.message}`, "warning");
-        }
-      } catch (e) {
-        console.warn("[rap+] logo patch skipped:", (e as Error).message);
-      }
-    });
+    // Patching the global Pi installation is an explicit opt-in maintenance action.
     const identityKey = identityOf(ctx);
     consoleBridgeOwnerRevision += 1;
     if (isInteractive(ctx)) {

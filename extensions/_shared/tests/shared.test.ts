@@ -204,3 +204,18 @@ test("runSubprocess reports -1 (not 0) for a signal-killed process", async () =>
 	assert.equal(r.exitCode, -1);
 	assert.equal(r.signal, "SIGTERM");
 });
+
+test("runSubprocess redacts secrets after collecting output", async () => {
+	const secret = "sk-ant-" + "a".repeat(32);
+	const r = await runSubprocess("node", ["-e", `process.stdout.write("api_key=${secret}")`]);
+	assert.match(r.stdout, /REDACTED:anthropic/i);
+	assert.doesNotMatch(r.stdout, new RegExp(secret));
+});
+
+test("runSubprocess enforces a combined stdout/stderr output budget", async () => {
+	const r = await runSubprocess("node", ["-e", "process.stdout.write('o'.repeat(1000)); process.stderr.write('e'.repeat(1000))"], {
+		maxOutputBytes: 100,
+	});
+	const total = Buffer.byteLength(r.stdout, "utf8") + Buffer.byteLength(r.stderr, "utf8");
+	assert.ok(total <= 100, `combined output bytes ${total} exceed the 100-byte limit`);
+});

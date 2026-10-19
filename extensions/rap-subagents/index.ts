@@ -38,6 +38,49 @@ import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 
+// Keep the child environment minimal. Never forward arbitrary shell/session
+// secrets; pass only runtime essentials and the selected provider's credential.
+const SUBAGENT_ENV_KEYS = [
+	"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TMP", "TEMP",
+	"LANG", "LC_ALL", "LC_CTYPE", "TERM", "COLORTERM", "NO_COLOR", "CI",
+	"XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "PI_AGENT_DIR",
+] as const;
+
+const PROVIDER_CREDENTIALS: Record<string, string[]> = {
+	anthropic: ["ANTHROPIC_API_KEY"],
+	openai: ["OPENAI_API_KEY"],
+	openrouter: ["OPENROUTER_API_KEY"],
+	google: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
+	gemini: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+	mistral: ["MISTRAL_API_KEY"],
+	deepseek: ["DEEPSEEK_API_KEY"],
+	groq: ["GROQ_API_KEY"],
+	"x-ai": ["XAI_API_KEY"],
+	xai: ["XAI_API_KEY"],
+	moonshot: ["MOONSHOT_API_KEY"],
+	kimi: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+	cohere: ["COHERE_API_KEY"],
+	perplexity: ["PERPLEXITY_API_KEY"],
+	together: ["TOGETHER_API_KEY"],
+	fireworks: ["FIREWORKS_API_KEY"],
+	cerebras: ["CEREBRAS_API_KEY"],
+};
+
+export function buildSubagentEnv(model?: string): Record<string, string> {
+	const env: Record<string, string> = {};
+	for (const key of SUBAGENT_ENV_KEYS) {
+		const value = process.env[key];
+		if (typeof value === "string") env[key] = value;
+	}
+	const provider = model?.split("/")[0]?.toLowerCase();
+	for (const key of PROVIDER_CREDENTIALS[provider ?? ""] ?? []) {
+		const value = process.env[key];
+		if (typeof value === "string") env[key] = value;
+	}
+	env.RAP_SUBAGENT_DEPTH = String(currentDepth() + 1);
+	return env;
+}
+
 /** Maximum task payload size passed on the command line (well under ARG_MAX). */
 export const TASK_ARG_MAX = 64 * 1024;
 
@@ -300,10 +343,13 @@ async function runSingleAgent(
 	const model = agent.model ?? dispatchDefaults.model;
 	if (model) args.push("--model", model);
 	if (inheritsDispatchConfig && dispatchDefaults.thinkingLevel) args.push("--thinking", dispatchDefaults.thinkingLevel);
-	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
+	// Agents without an explicit whitelist run in read-only mode by default.
+	// Mutating tools must be opted into in the agent's own frontmatter.
+	const effectiveTools = agent.tools && agent.tools.length > 0 ? agent.tools : ["read"];
+	args.push("--tools", effectiveTools.join(","));
 
 	// Propagate incremented depth to the child to bound recursive delegation.
-	const childEnv = { ...process.env, RAP_SUBAGENT_DEPTH: String(currentDepth() + 1) };
+	const childEnv = buildSubagentEnv(model);
 
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;
@@ -489,7 +535,7 @@ const SubagentParams = Type.Object({
 	chain: Type.Optional(Type.Array(ChainItem, { description: "Array of {agent, task} for sequential execution" })),
 	agentScope: Type.Optional(AgentScopeSchema),
 	confirmProjectAgents: Type.Optional(
-		Type.Boolean({ description: "Prompt before running project-local agents. Default: true.", default: true }),
+		Type.Boolean({ description: "Deprecated and ignored for untrusted project-local agents; user confirmation is mandatory unless the project is trusted.", default: true }),
 	),
 	cwd: Type.Optional(Type.String({ description: "Working directory for the agent process (single mode)" })),
 });
@@ -531,7 +577,6 @@ export default function rapSubagents(pi: ExtensionAPI) {
 			};
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
-			const confirmProjectAgents = params.confirmProjectAgents ?? true;
 
 			const hasChain = (params.chain?.length ?? 0) > 0;
 			const hasTasks = (params.tasks?.length ?? 0) > 0;
@@ -557,8 +602,6 @@ export default function rapSubagents(pi: ExtensionAPI) {
 
 			if (
 				(agentScope === "project" || agentScope === "both") &&
-				confirmProjectAgents &&
-				ctx.hasUI &&
 				!ctx.isProjectTrusted()
 			) {
 				const requestedAgentNames = new Set<string>();
@@ -570,7 +613,14 @@ export default function rapSubagents(pi: ExtensionAPI) {
 					.map((name) => agents.find((a) => a.name === name))
 					.filter((a): a is AgentConfig => a?.source === "project");
 
-				if (projectAgentsRequested.length > 0) {
+				if (projectAgentsRequested.length > 0 && !ctx.isProjectTrusted()) {
+					if (!ctx.hasUI || !ctx.ui?.confirm) {
+						return {
+							content: [{ type: "text", text: "Blocked: project-local agents are untrusted and this session has no interactive confirmation UI." }],
+							details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
+							isError: true,
+						};
+					}
 					const names = projectAgentsRequested.map((a) => a.name).join(", ");
 					const dir = discovery.projectAgentsDir ?? "(unknown)";
 					const ok = await ctx.ui.confirm(

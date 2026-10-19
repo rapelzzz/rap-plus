@@ -32,6 +32,11 @@ export interface RapTodoPlanInput {
   dependencies?: string[];
 }
 
+/** Detached snapshot so callers cannot mutate persisted manager state by reference. */
+function cloneProject(project: RapTodoProject): RapTodoProject {
+  return JSON.parse(JSON.stringify(project)) as RapTodoProject;
+}
+
 interface PlanTask {
   title: string;
   /** Titles this task depends on (resolved to IDs after the plan set is built). */
@@ -86,6 +91,7 @@ export class RapTodoManager {
   private readonly storage: RapTodoStorage;
   readonly projectRoot: string;
   private project: RapTodoProject;
+  private persistedProject: RapTodoProject;
   /** Load result, surfaced so callers can report corruption without destroying data. */
   readonly loadResult: RapTodoStorageLoadResult;
 
@@ -97,7 +103,8 @@ export class RapTodoManager {
   ) {
     this.storage = storage;
     this.projectRoot = projectRoot;
-    this.project = project;
+    this.project = cloneProject(project);
+    this.persistedProject = cloneProject(project);
     this.loadResult = loadResult;
   }
 
@@ -132,10 +139,10 @@ export class RapTodoManager {
   }
 
   getProject(): RapTodoProject {
-    return this.project;
+    return cloneProject(this.project);
   }
   getTodos(): RapTodoItem[] {
-    return this.project.todos;
+    return cloneProject(this.project).todos;
   }
   counts(): RapTodoCounts {
     return rapTodoCounts(this.project.todos);
@@ -149,15 +156,20 @@ export class RapTodoManager {
     );
   }
   find(id: string): RapTodoItem | undefined {
+    const item = this.project.todos.find((t) => t.id === id);
+    return item ? { ...item, dependencies: [...item.dependencies] } : undefined;
+  }
+
+  private findMutable(id: string): RapTodoItem | undefined {
     return this.project.todos.find((t) => t.id === id);
   }
 
   private commit(): RapTodoOpResult {
     // Corrupt data is never silently overwritten: refuse to persist any
     // mutation so the original (corrupt but recoverable) file is preserved.
-    // The in-memory project may have been tentatively mutated, but it is not
-    // saved; callers see a failure and the file stays intact for recovery.
+    // The tentative mutation is rolled back to the last persisted snapshot.
     if (this.isCorrupt()) {
+      this.project = cloneProject(this.persistedProject);
       return {
         ok: false,
         error:
@@ -166,12 +178,24 @@ export class RapTodoManager {
     }
     this.project.updatedAt = nowIso();
     const save = this.storage.save(this.projectRoot, this.project);
-    if (!save.ok) return { ok: false, error: save.error };
-    return { ok: true, project: this.project };
+    if (!save.ok) {
+      // Roll back in-memory state too; later operations must not persist a change
+      // that was previously reported as failed.
+      this.project = cloneProject(this.persistedProject);
+      return { ok: false, error: save.error };
+    }
+    this.persistedProject = cloneProject(this.project);
+    return { ok: true, project: cloneProject(this.project) };
   }
 
   private nextId(): string {
-    return String(this.project.nextId++);
+    const inUse = new Set(this.project.todos.map((todo) => todo.id));
+    let candidate = Number.isSafeInteger(this.project.nextId) && this.project.nextId > 0
+      ? this.project.nextId
+      : 1;
+    while (inUse.has(String(candidate))) candidate += 1;
+    this.project.nextId = candidate + 1;
+    return String(candidate);
   }
 
   add(title: string, source: RapTodoSource = "manual"): RapTodoOpResult {
@@ -192,9 +216,9 @@ export class RapTodoManager {
 
   /** Mark a task completed and record completion time. */
   check(id: string): RapTodoOpResult {
-    const item = this.find(id);
+    const item = this.findMutable(id);
     if (!item) return { ok: false, error: `Task ${id} not found` };
-    if (item.status === "completed") return { ok: true, project: this.project };
+    if (item.status === "completed") return { ok: true, project: cloneProject(this.project) };
     item.status = "completed";
     item.completedAt = nowIso();
     item.updatedAt = nowIso();
@@ -204,7 +228,7 @@ export class RapTodoManager {
 
   /** Reopen a completed task as pending. */
   uncheck(id: string): RapTodoOpResult {
-    const item = this.find(id);
+    const item = this.findMutable(id);
     if (!item) return { ok: false, error: `Task ${id} not found` };
     if (item.status !== "completed")
       return { ok: false, error: `Task ${id} is not completed` };
@@ -217,7 +241,7 @@ export class RapTodoManager {
   edit(id: string, title: string): RapTodoOpResult {
     const trimmed = title.trim();
     if (trimmed.length === 0) return { ok: false, error: "Task title cannot be empty" };
-    const item = this.find(id);
+    const item = this.findMutable(id);
     if (!item) return { ok: false, error: `Task ${id} not found` };
     item.title = trimmed;
     item.updatedAt = nowIso();
@@ -226,7 +250,7 @@ export class RapTodoManager {
 
   /** Remove a task. Returns IDs of tasks that depended on it (caller warns, never silently invalidates). */
   remove(id: string): RapTodoOpResult & { dependents?: string[] } {
-    const item = this.find(id);
+    const item = this.findMutable(id);
     if (!item) return { ok: false, error: `Task ${id} not found` };
     const dependents = this.project.todos
       .filter((t) => t.dependencies.includes(id))
@@ -248,7 +272,8 @@ export class RapTodoManager {
     const before = this.project.todos.length;
     this.project.todos = this.project.todos.filter((t) => t.status !== "completed");
     const removed = before - this.project.todos.length;
-    return { ...this.commit(), removed };
+    const result = this.commit();
+    return { ...result, removed: result.ok ? removed : 0 };
   }
 
   /** Remove ALL todos (completed + unfinished). Resets the active task. nextId stays monotonic. */
@@ -257,12 +282,13 @@ export class RapTodoManager {
     this.project.todos = [];
     this.project.activeTask = undefined;
     const removed = before;
-    return { ...this.commit(), removed };
+    const result = this.commit();
+    return { ...result, removed: result.ok ? removed : 0 };
   }
 
   /** Set a task's status with transition validation. */
   setStatus(id: string, status: RapTodoStatus): RapTodoOpResult {
-    const item = this.find(id);
+    const item = this.findMutable(id);
     if (!item) return { ok: false, error: `Task ${id} not found` };
     if (!rapTodoCanTransitionTo(item.status, status)) {
       return {
@@ -326,7 +352,7 @@ export class RapTodoManager {
       unfinishedAuto.length === planTasks.length &&
       planTasks.every((t) => unfinishedAutoTitles.has(t.title)) &&
       unfinishedAuto.every((t) => newTitles.has(t.title));
-    if (samePlan) return { ok: true, project: this.project };
+    if (samePlan) return { ok: true, project: cloneProject(this.project) };
 
     // Decide whether the previous automatic plan is fully complete. When it is,
     // its completed tasks are dropped so a new plan starts fresh — this prevents
@@ -362,7 +388,7 @@ export class RapTodoManager {
     // Wire dependencies (already validated, no cycles).
     for (const t of planTasks) {
       const id = titleToId.get(t.title)!;
-      const item = this.find(id)!;
+      const item = this.findMutable(id)!;
       item.dependencies = (t.dependsOnTitles ?? [])
         .map((d) => titleToId.get(d)!)
         .filter(Boolean);
@@ -373,15 +399,15 @@ export class RapTodoManager {
 
   /** Mark the next sensible task in progress (used by /todo resume). */
   resumeNext(): RapTodoOpResult & { resumedId?: string } {
-    if (!this.hasUnfinished()) return { ok: true, project: this.project };
+    if (!this.hasUnfinished()) return { ok: true, project: cloneProject(this.project) };
     // Prefer an already in_progress task.
     const inProg = this.project.todos.find((t) => t.status === "in_progress");
-    if (inProg) return { ok: true, project: this.project, resumedId: inProg.id };
+    if (inProg) return { ok: true, project: cloneProject(this.project), resumedId: inProg.id };
     // Else the first pending whose dependencies are all completed.
     const pending = this.project.todos.find(
       (t) =>
         t.status === "pending" &&
-        t.dependencies.every((d) => this.find(d)?.status === "completed"),
+        t.dependencies.every((d) => this.findMutable(d)?.status === "completed"),
     );
     if (pending) {
       const res = this.setStatus(pending.id, "in_progress");
@@ -393,7 +419,7 @@ export class RapTodoManager {
       const res = this.setStatus(anyPending.id, "in_progress");
       return { ...res, resumedId: res.ok ? anyPending.id : undefined };
     }
-    return { ok: true, project: this.project };
+    return { ok: true, project: cloneProject(this.project) };
   }
 }
 

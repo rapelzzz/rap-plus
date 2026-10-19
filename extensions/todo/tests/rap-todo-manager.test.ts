@@ -142,3 +142,40 @@ test("corrupt data: manager isCorrupt and mutations refuse without saving", () =
 	assert.equal(m.check("1").ok, false);
 	assert.equal(saveCalls, 0);
 });
+
+
+test("failed saves roll back in-memory changes and permit a clean retry", () => {
+	let stored: RapTodoProject | undefined;
+	let failSave = true;
+	const storage: RapTodoStorage = {
+		pathFor: () => "<mem>/todos.json",
+		load: () => stored ? { ok: true, data: structuredClone(stored) } : { ok: false, missing: true },
+		save: (_root, data) => {
+			if (failSave) return { ok: false, error: "simulated disk failure" };
+			stored = structuredClone(data);
+			return { ok: true };
+		},
+	};
+	const manager = RapTodoManager.load(storage, "/proj");
+	const failed = manager.add("must not linger", "manual");
+	assert.equal(failed.ok, false);
+	assert.equal(manager.getTodos().length, 0, "failed mutation must not remain in memory");
+	failSave = false;
+	const retried = manager.add("persisted", "manual");
+	assert.equal(retried.ok, true);
+	assert.deepEqual(manager.getTodos().map((todo) => [todo.id, todo.title]), [["1", "persisted"]]);
+});
+
+test("public todo accessors return defensive snapshots", () => {
+	const manager = freshManager();
+	manager.add("original", "manual");
+	const viaList = manager.getTodos();
+	viaList[0].title = "modified through array";
+	viaList[0].dependencies.push("unknown");
+	const viaFind = manager.find("1");
+	if (viaFind) viaFind.title = "modified through find";
+	const viaProject = manager.getProject();
+	viaProject.todos[0].title = "modified through project";
+	assert.equal(manager.find("1")?.title, "original");
+	assert.deepEqual(manager.find("1")?.dependencies, []);
+});

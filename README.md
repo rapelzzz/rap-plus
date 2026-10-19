@@ -11,21 +11,21 @@
 <p align="center">
   <a href="https://github.com/rapelzzz/rap-plus"><img alt="Pi package" src="https://img.shields.io/badge/Pi-extension-1F6FEB"></a>
   <a href="#requirements"><img alt="Node.js" src="https://img.shields.io/badge/node-%E2%89%A522.19-339933?logo=node.js&logoColor=white"></a>
-  <a href="#tests"><img alt="tests" src="https://img.shields.io/badge/tests-161%20passing-brightgreen"></a>
+  <a href="#tests"><img alt="tests" src="https://img.shields.io/badge/tests-automated-blue"></a>
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="last commit" src="https://img.shields.io/github/last-commit/rapelzzz/rap-plus">
 </p>
 
 ---
 
-rap-plus extends Pi with planning, delegation, code intelligence, evidence-first debugging, and guarded IDE tooling — wrapped in a signature `rap-bluemon` theme that recolors the Pi startup logo automatically. Every extension loads on `pi` launch with zero per-extension setup.
+rap-plus extends Pi with planning, delegation, code intelligence, evidence-first debugging, and guarded IDE tooling — wrapped in a signature `rap-bluemon` theme with optional Pi startup-logo customization. Every extension loads on `pi` launch with zero per-extension setup.
 
 ## Highlights
 
 - **10 extensions + 1 theme**, all registered automatically on install
-- **Vivid cobalt-blue theme** (`rap-bluemon`) with automatic Pi-logo recolor — runs at install via `postinstall` and self-heals at runtime after `pi update`
+- **Vivid cobalt-blue theme** (`rap-bluemon`) with optional, backed-up Pi-logo recolor
 - **Safety-first design** — read-only planning mode, reproduction-gated fixes, guarded edits, depth-limited subagents, read-only review
-- **161 passing tests** across shared utilities and all 10 extensions
+- **Automated unit and integration tests** for shared utilities and extension behavior
 - **One-line install** — `curl | sh` or `pi install git:...`, no manual steps
 
 ## Quick start
@@ -34,7 +34,7 @@ rap-plus extends Pi with planning, delegation, code intelligence, evidence-first
 curl -fsSL https://raw.githubusercontent.com/rapelzzz/rap-plus/main/install.sh | sh
 ```
 
-This installs Pi (if missing), registers the `rap-plus` package, and recolors the startup logo — all in one step. Then just run `pi`; the extensions load automatically.
+This installs Pi (if missing) and registers the `rap-plus` package. Then run `pi`; the extensions load automatically.
 
 Already have Pi? Install directly:
 
@@ -63,7 +63,7 @@ pi install git:github.com/rapelzzz/rap-plus@main     # pin a ref
 
 `rap-bluemon` is a vivid cobalt-blue dark theme — primary blue `#4f9eff`, blueBright `#79c0ff`, on a `#0d1117` canvas, with a 7-step blue powerline gradient as the status-bar signature. All extensions render through `theme.fg(...)` tokens and pick up the palette automatically.
 
-The Pi startup logo (`▀▀█` / "Pi" wordmark) uses hardcoded brand colors and is not themeable, so rap-plus recolors it for you: the `postinstall` hook patches the global Pi bundle at install time, and the rap-bluemon extension re-patches it at runtime whenever a `pi update` restores the original bundle. No manual command — the logo stays blue across Pi updates.
+The Pi startup logo (`▀▀█` / "Pi" wordmark) uses hardcoded brand colors and is not themeable. Logo recoloring is an opt-in maintenance action, not part of installation or session startup. Run `npm run recolor-logo` only when you intentionally want to modify the global Pi bundle; the script first creates a `.rap-plus-original.bak` backup beside each changed bundle file. To restore, copy that backup over the modified `.js` file.
 
 ## Extensions
 
@@ -71,7 +71,7 @@ The Pi startup logo (`▀▀█` / "Pi" wordmark) uses hardcoded brand colors an
 Toggleable read-only planning mode. When active, edit/write tools are removed from the active set and destructive bash commands are blocked via the `tool_call` event. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` and the `--plan` flag.
 
 ### rap-subagents — `subagent` tool
-Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and the nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`.
+Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and the nearest `.pi/agents`. Safety: minimal child environment (only runtime essentials and the selected provider credential), `read`-only default child tools, mandatory interactive confirmation for untrusted project-local agents, stderr redaction, and abort via `SIGTERM`→`SIGKILL`.
 
 ### rap-simplify — `/rap-simplify`
 Detects files changed via `git diff`, builds a scoped simplification review instruction, and sends it to the session agent. Shared git-diff parsing lives in `extensions/_shared/git-diff.ts`. Regression-safe — no silent edits.
@@ -97,8 +97,8 @@ Guarded IDE assistance:
 
 ## Safety invariants
 
-- **rap-plan-mode** — blocks writes (removes edit/write tools via `setActiveTools`) and destructive bash (via `tool_call`).
-- **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, no credential propagation.
+- **rap-plan-mode** — removes core edit/write tools and blocks tools outside an explicit audited read-only allowlist and permits only exact-match, no-argument shell commands with no shell metacharacters.
+- **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, no blanket credential propagation.
 - **rap-code-review** — read-only; never edits or publishes.
 - **rap-lens** — `lens_*` navigation/symbol/search tools are `readOnlyHint`; `lens_ast_grep_replace` and `lens_autofix` are mutating and clearly labeled.
 - **rap-debug-mode** — fix stage blocked until reproduction is confirmed.
@@ -112,12 +112,14 @@ Guarded IDE assistance:
 ## Tests
 
 ```sh
-npm test            # 161 passing tests
-npm run test:integration   # integration smoke tests (real git)
-npx tsc --noEmit    # typecheck (12 pre-existing baseline errors in rap-web-search.ts DOM types)
+npm ci
+npm audit --omit=dev --audit-level=high
+npm test
+npm run test:integration
+npm run typecheck
 ```
 
-161 passing tests across shared utilities and all 10 extensions. Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
+Tests are maintained under `extensions/` and run with Node's built-in test runner. The integration suite exercises the shared Git-diff handling against a temporary real Git repository. Run all three commands in CI and locally before releasing.
 
 ## Manage
 

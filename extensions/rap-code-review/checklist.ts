@@ -70,6 +70,17 @@ const CHECKLISTS: Record<Language, readonly string[]> = {
 
 /** Build a concise, language-grouped checklist for the files edited this turn. */
 export function formatChecklist(files: readonly string[]): string {
+	// A root marker means an opaque command may have changed arbitrary project
+	// files. Do not drop it merely because "." has no language extension.
+	if (files.includes(".")) {
+		return `[CODE REVIEW CHECKLIST — broad project changes]
+A shell, subagent, debugger, or other opaque execution tool ran. Before continuing, inspect the full git diff and git status, identify every changed/untracked file, and review them for:
+- Correctness and regression risk; ensure behavior matches the task.
+- Path traversal, shell/argument injection, unsafe network access, and secret exposure.
+- Error/abort handling, temporary files, child-process cleanup, and race conditions.
+- Tests updated/added for every behavior change; run the relevant test suite and typecheck.
+Do not assume the command touched only the file or path mentioned in its prompt.`;
+	}
 	const byLang = new Map<Language, string[]>();
 	for (const f of files) {
 		const lang = detectLanguage(f);

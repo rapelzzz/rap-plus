@@ -15,6 +15,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { CdpClient, parseInspectUrl } from "./cdp.ts";
+import { isPathSafe, resolveWithin } from "../_shared/safety.ts";
 
 export interface SystemMetrics {
 	platform: string;
@@ -111,6 +112,12 @@ export async function captureCpuProfile(
 	opts: { cwd?: string; durationMs?: number; outFile?: string; timeoutMs?: number } = {},
 ): Promise<CpuProfileResult> {
 	const durationMs = opts.durationMs ?? 2000;
+	const root = path.resolve(opts.cwd ?? process.cwd());
+	const requestedOutFile = opts.outFile ?? "rap-cpu-profile.cpuprofile";
+	if (!isPathSafe(root, requestedOutFile)) {
+		throw new Error("CPU profile output must remain inside the project root.");
+	}
+	const outFile = resolveWithin(root, requestedOutFile);
 	const proc = spawn(process.execPath, ["--inspect-brk=0", "-e", script], {
 		cwd: opts.cwd,
 		stdio: ["pipe", "pipe", "pipe"],
@@ -144,8 +151,8 @@ export async function captureCpuProfile(
 			}
 			const sampleCount = profile.samples?.length ?? 0;
 			const top = parseProfileTopFunctions(profile);
-			const outFile = path.resolve(opts.cwd ?? process.cwd(), opts.outFile ?? "rap-cpu-profile.cpuprofile");
-			fs.writeFileSync(outFile, JSON.stringify(profile));
+			fs.writeFileSync(outFile, JSON.stringify(profile), { encoding: "utf8", mode: 0o600 });
+			fs.chmodSync(outFile, 0o600);
 			return { file: outFile, durationMs, sampleCount, topFunctions: top, earlyExit };
 		} finally {
 			client.close();
@@ -161,19 +168,36 @@ export async function captureCpuProfile(
 
 function waitForBanner(proc: ChildProcessWithoutNullStreams, stderr: string[], timeoutMs: number): Promise<string> {
 	return new Promise((resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error("CPU profile target did not expose inspector: " + stderr.join(""))), timeoutMs);
+		let timer: NodeJS.Timeout | undefined;
+		let poll: NodeJS.Timeout | undefined;
+		let settled = false;
+		const cleanup = () => {
+			if (timer) clearTimeout(timer);
+			if (poll) clearTimeout(poll);
+			proc.removeListener("exit", onExit);
+		};
+		const fail = (error: Error) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			reject(error);
+		};
+		const onExit = () => fail(new Error("target exited before inspector banner: " + stderr.join("")));
 		const check = () => {
+			if (settled) return;
 			const url = parseInspectUrl(stderr.join(""));
 			if (url) {
-				clearTimeout(timer);
+				settled = true;
+				cleanup();
 				resolve(url);
-			} else if (proc.killed) {
-				clearTimeout(timer);
-				reject(new Error("target exited before inspector banner"));
+			} else if (proc.exitCode !== null || proc.signalCode !== null) {
+				fail(new Error("target exited before inspector banner: " + stderr.join("")));
 			} else {
-				setTimeout(check, 50);
+				poll = setTimeout(check, 50);
 			}
 		};
+		timer = setTimeout(() => fail(new Error("CPU profile target did not expose inspector: " + stderr.join(""))), timeoutMs);
+		proc.once("exit", onExit);
 		check();
 	});
 }

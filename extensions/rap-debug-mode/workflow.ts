@@ -21,8 +21,10 @@ export interface DebugState {
 	hypotheses: string[];
 	probesRun: string[];
 	reproConfirmed: boolean;
+	reproEvidence: string;
 	fixDescription: string;
 	verified: boolean;
+	verificationEvidence: string;
 }
 
 export function freshDebugState(): DebugState {
@@ -32,8 +34,10 @@ export function freshDebugState(): DebugState {
 		hypotheses: [],
 		probesRun: [],
 		reproConfirmed: false,
+		reproEvidence: "",
 		fixDescription: "",
 		verified: false,
+		verificationEvidence: "",
 	};
 }
 
@@ -84,8 +88,10 @@ export interface CheckpointInput {
 	hypothesis?: string;
 	probe?: string;
 	reproConfirmed?: boolean;
+	reproEvidence?: string;
 	fix?: string;
 	verified?: boolean;
+	verificationEvidence?: string;
 }
 
 export function applyCheckpoint(state: DebugState, input: CheckpointInput): { state: DebugState; ok: boolean; reason?: string; guidance: string } {
@@ -94,9 +100,19 @@ export function applyCheckpoint(state: DebugState, input: CheckpointInput): { st
 	if (input.evidence) next.hasEvidence = true;
 	if (input.hypothesis) next.hypotheses.push(input.hypothesis);
 	if (input.probe) next.probesRun.push(input.probe);
+	if (input.reproEvidence?.trim()) next.reproEvidence = input.reproEvidence.trim();
+	if (input.verificationEvidence?.trim()) next.verificationEvidence = input.verificationEvidence.trim();
+	if (input.reproConfirmed === true && !next.reproEvidence) {
+		return { state: next, ok: false, reason: "Reproduction confirmation requires a written reproduction-evidence record.", guidance: "Record the exact reproduction steps and observed result; this tool cannot independently verify execution." };
+	}
+	if (input.verified === true && !next.verificationEvidence) {
+		return { state: next, ok: false, reason: "Verification requires a written verification-evidence record.", guidance: "Record the exact verification command or procedure and observed result; this tool cannot independently verify execution." };
+	}
 	if (typeof input.reproConfirmed === "boolean") next.reproConfirmed = input.reproConfirmed;
+	if (input.reproConfirmed === false) next.reproEvidence = "";
 	if (input.fix) next.fixDescription = input.fix;
 	if (typeof input.verified === "boolean") next.verified = input.verified;
+	if (input.verified === false) next.verificationEvidence = "";
 
 	const target = input.stage ?? next.stage;
 	if (input.stage) {
@@ -131,7 +147,7 @@ export function guidanceFor(state: DebugState): string {
 				: "Run a probe (log, assert, repro step) to test a hypothesis.";
 		case "reproduce":
 			return state.reproConfirmed
-				? "Reproduction confirmed. Apply the SMALLEST fix addressing the root cause (stage: fix)."
+				? "Reproduction is recorded as confirmed by the agent (not independently verified). Apply the SMALLEST fix addressing the root cause (stage: fix)."
 				: "Confirm a deterministic reproduction before fixing.";
 		case "fix":
 			return state.fixDescription
@@ -139,7 +155,7 @@ export function guidanceFor(state: DebugState): string {
 				: "Apply the smallest fix addressing the root cause and describe it.";
 		case "verify":
 			return state.verified
-				? "Verified. Debugging complete."
+				? "Verification is recorded by the agent (not independently verified). Review the cited command/procedure output before treating the issue as resolved."
 				: "Re-run the reproduction. Mark verified only if it passes.";
 	}
 }

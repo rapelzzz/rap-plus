@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { format as formatConsoleArguments } from "node:util";
 import { EXT_PREFIX, type ExtensionErrorSink } from "./errors.ts";
+import { redactSecrets } from "../../_shared/safety.ts";
 
 export const RAP_BLUEMON_LOG_FILE = "rap-bluemon.log";
 export const RAP_LOG_MAX_BYTES = 1024 * 1024;
@@ -177,7 +178,7 @@ async function readRecentLogTail(filePath: string): Promise<string> {
 async function replaceLogFile(filePath: string, content: string): Promise<void> {
   const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await fs.promises.writeFile(temporaryPath, content, "utf8");
+    await fs.promises.writeFile(temporaryPath, content, { encoding: "utf8", mode: 0o600 });
     await fs.promises.rename(temporaryPath, filePath);
   } finally {
     try {
@@ -197,7 +198,8 @@ async function appendBoundedLogLine(filePath: string, line: string): Promise<voi
   }
 
   if (currentSize + Buffer.byteLength(line, "utf8") <= RAP_LOG_MAX_BYTES) {
-    await fs.promises.appendFile(filePath, line, "utf8");
+    await fs.promises.appendFile(filePath, line, { encoding: "utf8", mode: 0o600 });
+    await fs.promises.chmod(filePath, 0o600);
     return;
   }
 
@@ -212,6 +214,7 @@ async function appendBoundedLogLine(filePath: string, line: string): Promise<voi
   );
   const boundedLine = limitLogEntry(line, availableEntryBytes);
   await replaceLogFile(filePath, `${retained}${trimMarker}${boundedLine}`);
+  await fs.promises.chmod(filePath, 0o600);
 }
 
 function rememberRecentPath(paths: Set<string>, value: string): void {
@@ -450,6 +453,7 @@ function formatLogLine(
   } catch {
     message = args.map((value) => String(value)).join(" ");
   }
+  message = redactSecrets(message);
   return `[${now().toISOString()}] ${level} ${message}\n`;
 }
 

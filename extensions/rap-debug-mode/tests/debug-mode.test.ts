@@ -57,13 +57,22 @@ test("applyCheckpoint accumulates evidence/hypothesis/probe and advances", () =>
 	assert.equal(s.hypotheses.length, 1);
 	s = applyCheckpoint(s, { stage: "probe", probe: "added log" }).state;
 	assert.equal(s.probesRun.length, 1);
-	s = applyCheckpoint(s, { stage: "reproduce", reproConfirmed: true }).state;
+	s = applyCheckpoint(s, { stage: "reproduce", reproConfirmed: true, reproEvidence: "same minimal repro failed twice before the fix" }).state;
 	assert.equal(s.reproConfirmed, true);
 	s = applyCheckpoint(s, { stage: "fix", fix: "guard null" }).state;
 	assert.equal(s.fixDescription, "guard null");
-	const v = applyCheckpoint(s, { stage: "verify", verified: true });
+	const v = applyCheckpoint(s, { stage: "verify", verified: true, verificationEvidence: "npm test completed successfully after the fix" });
 	assert.equal(v.state.verified, true);
 	assert.equal(v.state.stage, "verify");
+});
+
+test("applyCheckpoint requires recorded evidence before setting self-reported confirmation flags", () => {
+	const repro = applyCheckpoint(freshDebugState(), { reproConfirmed: true });
+	assert.equal(repro.ok, false);
+	assert.match(repro.reason!, /evidence/i);
+	const verified = applyCheckpoint(freshDebugState(), { verified: true });
+	assert.equal(verified.ok, false);
+	assert.match(verified.reason!, /verification[- ]evidence/i);
 });
 
 test("applyCheckpoint rejects fix when repro not confirmed", () => {

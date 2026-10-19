@@ -153,3 +153,22 @@ test("TsLanguageService re-reads a file after it is edited (mtime invalidation)"
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("language service blocks arbitrary out-of-root file paths", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-lens-lsp-outside-"));
+	const outside = fs.mkdtempSync(path.join(os.tmpdir(), "rap-lens-lsp-secret-"));
+	const secret = path.join(outside, "secret.ts");
+	fs.writeFileSync(path.join(dir, "entry.ts"), "export const entry = 1;\n");
+	fs.writeFileSync(secret, "export const secret = 42;\n");
+	try {
+		const svc = TsLanguageService.create(dir);
+		if (!svc) return;
+		assert.deepEqual(svc.getDefinition(secret, 1, 14), []);
+		assert.deepEqual(svc.getReferences(secret, 1, 14), []);
+		assert.equal(svc.getQuickInfo(secret, 1, 14), undefined);
+		assert.equal(svc.resolveSnapshot(secret).source, undefined);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outside, { recursive: true, force: true });
+	}
+});

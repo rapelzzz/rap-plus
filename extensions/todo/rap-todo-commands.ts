@@ -279,6 +279,10 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
             .getTodos()
             .filter((t) => t.dependencies.includes(rest))
             .map((t) => `#${t.id} (${t.title})`);
+          if (dependents.length > 0 && (!ctx.hasUI || !ctx.ui?.confirm)) {
+            notifyResult(ctx, false, "Cannot remove this task without interactive confirmation because other tasks depend on it.");
+            return;
+          }
           if (dependents.length > 0 && ctx.hasUI) {
             const ok = await ctx.ui.confirm(
               "Remove task?",
@@ -321,6 +325,10 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
         }
 
         case "clear-completed": {
+          if (!ctx.hasUI || !ctx.ui?.confirm) {
+            notifyResult(ctx, false, "Cannot clear completed todos without interactive confirmation; no records were changed.");
+            return;
+          }
           if (ctx.hasUI) {
             const ok = await ctx.ui.confirm(
               "Clear completed todos?",
@@ -342,6 +350,10 @@ export function registerRapTodoCommands(pi: ExtensionAPI, deps: RapTodoFeatureDe
         }
 
         case "clear": {
+          if (!ctx.hasUI || !ctx.ui?.confirm) {
+            notifyResult(ctx, false, "Cannot clear todos without interactive confirmation; no records were changed.");
+            return;
+          }
           if (ctx.hasUI) {
             const ok = await ctx.ui.confirm(
               "Clear ALL todos?",
