@@ -10,6 +10,7 @@
  */
 
 import * as path from "node:path";
+import { existsSync } from "node:fs";
 import { isPathSafe, resolveWithin } from "../_shared/safety.ts";
 
 export interface GuardResult {
@@ -40,6 +41,9 @@ export function validateEditTarget(cwd: string, filePath: string, content: strin
 		return { ok: false, reason: `Refusing to edit outside project root: ${filePath}` };
 	}
 	const abs = resolveWithin(cwd, filePath);
+	if (content.length === 0 && existsSync(abs)) {
+		return { ok: false, reason: `Refusing to overwrite existing file with empty content: ${filePath}` };
+	}
 	for (const re of SENSITIVE_PATTERNS) {
 		if (re.test(abs)) {
 			return { ok: false, reason: `Refusing to edit sensitive path: ${abs}` };
