@@ -13,6 +13,7 @@
 import * as os from "node:os";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isPathSafe, resolveWithin } from "../_shared/safety.ts";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { CdpClient, parseInspectUrl } from "./cdp.ts";
 
@@ -95,6 +96,17 @@ export function parseProfileTopFunctions(profile: CpuProfile, limit = 10): HotFu
 		.slice(0, limit);
 }
 
+/** Resolve a profile output path inside the project; unsafe requests fall back to the default filename. */
+export function resolveCpuProfileOutFile(cwd: string, requested?: string): string {
+	const fallback = "rap-cpu-profile.cpuprofile";
+	const candidate = requested ?? fallback;
+	const hasTraversal = candidate.split(/[\\/]/).includes("..");
+	if (!candidate || path.isAbsolute(candidate) || hasTraversal || !isPathSafe(cwd, candidate)) {
+		return resolveWithin(cwd, fallback);
+	}
+	return resolveWithin(cwd, candidate);
+}
+
 export interface CpuProfileResult {
 	file: string;
 	durationMs: number;
@@ -144,7 +156,7 @@ export async function captureCpuProfile(
 			}
 			const sampleCount = profile.samples?.length ?? 0;
 			const top = parseProfileTopFunctions(profile);
-			const outFile = path.resolve(opts.cwd ?? process.cwd(), opts.outFile ?? "rap-cpu-profile.cpuprofile");
+			const outFile = resolveCpuProfileOutFile(opts.cwd ?? process.cwd(), opts.outFile);
 			fs.writeFileSync(outFile, JSON.stringify(profile));
 			return { file: outFile, durationMs, sampleCount, topFunctions: top, earlyExit };
 		} finally {
