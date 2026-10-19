@@ -28,7 +28,8 @@ export default function rapBashRenderer(pi: ExtensionAPI): void {
 		return {
 			...(base ?? {}),
 			renderCall(args, theme, context) {
-				const command = typeof args.command === "string" ? args.command : "";
+				const callArgs = args as { command?: unknown };
+				const command = typeof callArgs.command === "string" ? callArgs.command : "";
 				const commands = displayCommands(command);
 				const visible = context.expanded ? commands : commands.slice(0, 5);
 				const lines = [theme.fg("toolTitle", "• ❯ Ran")];
