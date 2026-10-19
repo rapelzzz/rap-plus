@@ -2,7 +2,7 @@
  * rap-plan-mode — read-only planning mode for Pi.
  *
  * Toggleable read-only mode that TECHNICALLY blocks write/edit tools (via
- * setActiveTools) and destructive bash (via tool_call handler). Supports
+ * setActiveTools) and bash commands outside a small exact-match read-only allowlist (via tool_call handler). Supports
  * numbered plan extraction, [DONE:n] progress tracking, a progress widget,
  * session persistence, a shortcut, and a `--plan` startup flag.
  *
@@ -14,7 +14,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key } from "@earendil-works/pi-tui";
-import { isSafeCommand } from "../_shared/bash-allowlist.ts";
+import { isSafePlanModeBashCommand } from "../_shared/plan-mode-guard.ts";
 import { extractTodoItems, markCompletedSteps, resolvePlanModeTools, filterRegisteredTools, type TodoItem } from "./utils.ts";
 
 // Read-only tools retained in plan mode; edit/write removed.
@@ -155,16 +155,30 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		handler: async (ctx) => togglePlanMode(ctx),
 	});
 
-	// TECHNICAL SAFETY GATE: block destructive bash while planning.
+	// Fail-closed capability gate. Tool annotations are advisory and can be
+	// wrong, so planning mode uses an explicit allowlist of operations verified
+	// to be read-only. New tools are blocked until deliberately reviewed here.
+	const READ_ONLY_TOOLS = new Set([
+		"read", "web_search",
+		"ide_search", "ide_diff", "ide_system_metrics",
+		"lens_goto_definition", "lens_find_references", "lens_hover",
+		"lens_symbol_search", "lens_module_report", "lens_read_symbol", "lens_ast_grep",
+	]);
 	pi.on("tool_call", async (event) => {
-		if (!planModeEnabled || event.toolName !== "bash") return;
-		const command = event.input.command as string;
-		if (!isSafeCommand(command)) {
+		if (!planModeEnabled) return;
+		if (event.toolName === "bash") {
+			const command = event.input.command;
+			if (typeof command === "string" && isSafePlanModeBashCommand(command)) return;
 			return {
 				block: true,
-				reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\nCommand: ${command}`,
+				reason: "rap-plan-mode: bash command is not allowlisted. Disable plan mode before running commands.",
 			};
 		}
+		if (READ_ONLY_TOOLS.has(event.toolName)) return;
+		return {
+			block: true,
+			reason: `rap-plan-mode: ${event.toolName} is not in the verified read-only allowlist. Disable plan mode before using this tool.`,
+		};
 	});
 
 	// Drop stale plan-mode context when not active.
@@ -200,7 +214,7 @@ You are in rap-plan-mode — a read-only exploration mode.
 
 Restrictions (enforced at the tool layer):
 - edit and write tools are disabled
-- bash is restricted to an allowlist of read-only commands
+- bash is restricted to a small exact-match allowlist of read-only commands; shell syntax and arbitrary arguments are blocked
 
 Ask clarifying questions using the questionnaire tool.
 

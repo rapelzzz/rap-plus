@@ -18,8 +18,29 @@ export interface GuardResult {
 	absPath?: string;
 }
 
+/** Validate the shape of guarded write/edit arguments before any file is touched. */
+export function validateEditInputShape(input: {
+	old_text?: string;
+	new_text?: string;
+	content?: string;
+}): string | null {
+	const hasOldText = input.old_text !== undefined;
+	const hasNewText = input.new_text !== undefined;
+	if (hasOldText !== hasNewText || (hasOldText && input.content !== undefined)) {
+		return "provide both old_text and new_text for edit mode, or content alone for write mode.";
+	}
+	if (hasOldText && input.old_text === "") {
+		return "old_text must not be empty.";
+	}
+	if (!hasOldText && input.content === undefined) {
+		return "content is required for write mode; no file was changed.";
+	}
+	return null;
+}
+
 /** Paths that must never be edited by a guarded tool. */
 const SENSITIVE_PATTERNS = [
+	/(^|\/)\.git(\/|$)/i,
 	/\/\.env(\..*)?$/i,
 	/\/\.ssh\//i,
 	/\/\.aws\//i,
@@ -40,8 +61,9 @@ export function validateEditTarget(cwd: string, filePath: string, content: strin
 		return { ok: false, reason: `Refusing to edit outside project root: ${filePath}` };
 	}
 	const abs = resolveWithin(cwd, filePath);
+	const normalizedAbs = abs.replace(/\\/g, "/");
 	for (const re of SENSITIVE_PATTERNS) {
-		if (re.test(abs)) {
+		if (re.test(normalizedAbs)) {
 			return { ok: false, reason: `Refusing to edit sensitive path: ${abs}` };
 		}
 	}
@@ -66,7 +88,7 @@ export function validateEdit(cwd: string, filePath: string, oldText: string, new
 /** Whether a path looks like a sensitive file (for read-side blocking too). */
 export function isSensitivePath(cwd: string, filePath: string): boolean {
 	if (!isPathSafe(cwd, filePath)) return true;
-	const abs = resolveWithin(cwd, filePath);
+	const abs = resolveWithin(cwd, filePath).replace(/\\/g, "/");
 	return SENSITIVE_PATTERNS.some((re) => re.test(abs));
 }
 

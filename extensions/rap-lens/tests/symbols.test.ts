@@ -99,3 +99,18 @@ test("regex fallback works when no LanguageService is provided", () => {
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("moduleReport and readSymbol refuse files outside the project root", () => {
+	const dir = makeProject();
+	const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-lens-outside-"));
+	const outsideFile = path.join(outsideDir, "secret.ts");
+	fs.writeFileSync(outsideFile, "export const secret = 'not for project reads';\n");
+	try {
+		const svc = TsLanguageService.create(dir);
+		assert.match(moduleReport(svc, outsideFile, dir), /refusing: path escapes project root/i);
+		assert.equal(readSymbol(svc, outsideFile, 1, 14, dir), undefined);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+		fs.rmSync(outsideDir, { recursive: true, force: true });
+	}
+});

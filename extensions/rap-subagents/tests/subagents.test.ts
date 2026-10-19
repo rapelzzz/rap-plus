@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import {
 	currentDepth,
+	buildSubagentEnv,
 	MAX_CHAIN_DEPTH,
 	mapWithConcurrencyLimit,
 	truncateParallelOutput,
@@ -113,4 +114,25 @@ test("capTaskArg truncates oversized tasks with a notice", () => {
 	assert.match(capped, /\[task truncated/);
 	// The boundary itself is the cutoff: exactly TASK_ARG_MAX stays unchanged.
 	assert.equal(capTaskArg("x".repeat(TASK_ARG_MAX)).length, TASK_ARG_MAX);
+});
+
+test("buildSubagentEnv does not forward unrelated secrets to children", () => {
+	const keys = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "RAP_SUBAGENT_UNSAFE_SECRET"];
+	const saved = new Map(keys.map((key) => [key, process.env[key]]));
+	try {
+		process.env.ANTHROPIC_API_KEY = "test-anthropic-key";
+		process.env.OPENAI_API_KEY = "test-openai-key";
+		process.env.RAP_SUBAGENT_UNSAFE_SECRET = "do-not-forward";
+		const env = buildSubagentEnv("anthropic/claude-test");
+		assert.equal(env.ANTHROPIC_API_KEY, "test-anthropic-key");
+		assert.equal(env.OPENAI_API_KEY, undefined);
+		assert.equal(env.RAP_SUBAGENT_UNSAFE_SECRET, undefined);
+		assert.equal(env.RAP_SUBAGENT_DEPTH, String(currentDepth() + 1));
+	} finally {
+		for (const key of keys) {
+			const value = saved.get(key);
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+		}
+	}
 });

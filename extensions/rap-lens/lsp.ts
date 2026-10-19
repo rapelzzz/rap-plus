@@ -1,3 +1,4 @@
+import { isPathSafe } from "../_shared/safety.ts";
 /**
  * TypeScript LanguageService wrapper for rap-lens navigation.
  *
@@ -180,6 +181,7 @@ export class TsLanguageService {
 
 	/** Resolve a (1-based) line/col in `file` to definition locations. */
 	getDefinition(file: string, line: number, col: number): NavLocation[] {
+		if (!isPathSafe(this.cwd, file)) return [];
 		const abs = path.resolve(this.cwd, file);
 		const source = this.snapshot(abs);
 		if (!source) return [];
@@ -191,6 +193,7 @@ export class TsLanguageService {
 
 	/** Find references for the symbol at (1-based) line/col in `file`. */
 	getReferences(file: string, line: number, col: number): NavLocation[] {
+		if (!isPathSafe(this.cwd, file)) return [];
 		const abs = path.resolve(this.cwd, file);
 		const source = this.snapshot(abs);
 		if (!source) return [];
@@ -202,6 +205,7 @@ export class TsLanguageService {
 
 	/** Hover/quick-info text for the symbol at (1-based) line/col. */
 	getQuickInfo(file: string, line: number, col: number): string | undefined {
+		if (!isPathSafe(this.cwd, file)) return undefined;
 		const abs = path.resolve(this.cwd, file);
 		const source = this.snapshot(abs);
 		if (!source) return undefined;
@@ -218,6 +222,7 @@ export class TsLanguageService {
 
 	/** Resolve a relative file path + read its snapshot (shared helper). */
 	resolveSnapshot(file: string): { abs: string; source: string | undefined } {
+		if (!isPathSafe(this.cwd, file)) return { abs: path.resolve(this.cwd, file), source: undefined };
 		const abs = path.resolve(this.cwd, file);
 		return { abs, source: this.snapshot(abs) };
 	}

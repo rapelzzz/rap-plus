@@ -82,14 +82,22 @@ export function runSubprocess(
 		let timedOut = false;
 		let settled = false;
 		let exited = false; // set when the process has actually exited (distinct from proc.killed)
+		let graceTimer: NodeJS.Timeout | undefined;
+		const perStreamCap = Math.floor(maxOutputBytes / 2);
+		// Capture a small bounded lookahead beyond the user-visible cap so a
+		// credential that straddles the output boundary can still be redacted
+		// before truncation. Returned output remains capped at maxOutputBytes.
+		const capturePerStreamCap = perStreamCap + 8192;
 
-		const clean = redact ? (s: string) => redactSecrets(s) : (s: string) => s;
+		const clean = (s: string) => redact ? redactSecrets(s) : s;
 
-		// Stop accumulating well past the cap to bound memory; final truncation
-		// (with notice) happens in finish().
+		// Redact after capture so secrets split across process chunks are still
+		// found; bound raw capture independently to prevent unbounded memory use.
 		const appendCapped = (buf: string, chunk: Buffer): string => {
-			if (Buffer.byteLength(buf, "utf8") >= maxOutputBytes * 2) return buf;
-			return buf + clean(chunk.toString("utf8"));
+			const currentBytes = Buffer.byteLength(buf, "utf8");
+			if (currentBytes >= capturePerStreamCap) return buf;
+			const remaining = capturePerStreamCap - currentBytes;
+			return buf + chunk.subarray(0, remaining).toString("utf8");
 		};
 		const onOut = (chunk: Buffer) => { stdout = appendCapped(stdout, chunk); };
 		const onErr = (chunk: Buffer) => { stderr = appendCapped(stderr, chunk); };
@@ -113,15 +121,15 @@ export function runSubprocess(
 				command,
 				args,
 				exitCode: reportedExit,
-				stdout: truncateToBytes(stdout, maxOutputBytes),
-				stderr: truncateToBytes(stderr, maxOutputBytes),
+				stdout: truncateToBytes(clean(stdout), perStreamCap),
+				stderr: truncateToBytes(clean(stderr), perStreamCap),
 				timedOut,
 				signal: sig,
 				wallMs,
 			};
 			if (timedOut) {
 				reject(new TimeoutError(command, timeoutMs ?? 0));
-			} else if (sig === "SIGTERM" && signal?.aborted) {
+			} else if (signal?.aborted) {
 				reject(new Error(`Command aborted: ${command}`));
 			} else {
 				resolve(result);
@@ -143,18 +151,14 @@ export function runSubprocess(
 			} catch {
 				/* process may have just exited */
 			}
-			setTimeout(() => {
-				// proc.killed is true the moment kill() is called, so it can't be used
-				// to detect actual exit. Use our own `exited` flag instead: if the
-				// process hasn't closed by the grace period, escalate to SIGKILL.
+			if (graceTimer) clearTimeout(graceTimer);
+			graceTimer = setTimeout(() => {
+				// proc.killed reflects whether kill() was requested, not actual exit.
 				if (!exited) {
-					try {
-						proc.kill("SIGKILL");
-					} catch {
-						/* already gone */
-					}
+					try { proc.kill("SIGKILL"); } catch { /* already gone */ }
 				}
-			}, graceMs).unref();
+			}, graceMs);
+			graceTimer.unref();
 		};
 
 		const onAbort = () => {
@@ -163,6 +167,7 @@ export function runSubprocess(
 
 		const clear = () => {
 			clearTimer();
+			if (graceTimer) clearTimeout(graceTimer);
 			signal?.removeEventListener("abort", onAbort);
 		};
 

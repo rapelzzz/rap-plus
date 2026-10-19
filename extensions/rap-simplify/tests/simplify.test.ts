@@ -78,12 +78,14 @@ test("parseSimplifyArgs parses --staged, --ref, files", () => {
 
 test("buildDiffArgs assembles git diff args", () => {
 	assert.deepEqual(buildDiffArgs({ staged: true, ref: undefined, files: [] }), [
-		"--cached",
+		"--no-ext-diff",
 		"--no-color",
 		"-U0",
+		"--cached",
 	]);
-	assert.deepEqual(buildDiffArgs({ staged: false, ref: "main", files: [] }), ["main", "--no-color", "-U0"]);
+	assert.deepEqual(buildDiffArgs({ staged: false, ref: "main", files: [] }), ["--no-ext-diff", "--no-color", "-U0", "main"]);
 	assert.deepEqual(buildDiffArgs({ staged: false, ref: undefined, files: ["a.ts", "b.ts"] }), [
+		"--no-ext-diff",
 		"--no-color",
 		"-U0",
 		"--",

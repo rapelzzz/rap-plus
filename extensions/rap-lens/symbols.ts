@@ -8,6 +8,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isPathSafe } from "../_shared/safety.ts";
 import * as ts from "typescript";
 import { TsLanguageService, offsetToLineCol } from "./lsp.ts";
 
@@ -79,6 +80,7 @@ interface OutlineNode {
 
 /** Build a module structure outline for `file`. */
 export function moduleReport(svc: TsLanguageService | null, file: string, cwd: string): string {
+	if (!isPathSafe(cwd, file)) return `Refusing: path escapes project root: ${file}`;
 	if (!svc) return regexModuleReport(file, cwd);
 	const abs = path.resolve(cwd, file);
 	const source = svc.resolveSnapshot(file).source;
@@ -117,7 +119,7 @@ export function readSymbol(
 	col: number,
 	cwd: string,
 ): { name: string; type: string; source: string } | undefined {
-	if (!svc) return undefined;
+	if (!isPathSafe(cwd, file) || !svc) return undefined;
 	const abs = path.resolve(cwd, file);
 	const { source } = svc.resolveSnapshot(file);
 	if (!source) return undefined;

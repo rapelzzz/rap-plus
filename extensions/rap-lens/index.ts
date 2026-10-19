@@ -92,6 +92,11 @@ export default function rapLens(pi: ExtensionAPI): void {
 		description: "Generate a self-contained HTML module map of the project (writes lens-map.html).",
 		handler: async (args, ctx) => {
 			const outFile = args.trim() || "lens-map.html";
+			const pathErr = validatePaths(ctx.cwd, [outFile]);
+			if (pathErr) {
+				ctx.ui.notify(pathErr, "error");
+				return;
+			}
 			const svc = getService(ctx.cwd);
 			const abs = writeLensMap(svc, ctx.cwd, outFile);
 			ctx.ui.notify(`rap-lens: module map written to ${path.relative(ctx.cwd, abs)}`, "info");
@@ -112,6 +117,8 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
 			const svc = getService(ctx.cwd);
 			if (!svc) return textResult("rap-lens: TypeScript LanguageService unavailable (typescript not installed).");
 			const defs = svc.getDefinition(params.file, params.line, params.column);
@@ -131,6 +138,8 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
 			const svc = getService(ctx.cwd);
 			if (!svc) return textResult("rap-lens: TypeScript LanguageService unavailable.");
 			const refs = svc.getReferences(params.file, params.line, params.column);
@@ -150,6 +159,8 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
 			const svc = getService(ctx.cwd);
 			if (!svc) return textResult("rap-lens: TypeScript LanguageService unavailable.");
 			const info = svc.getQuickInfo(params.file, params.line, params.column);
@@ -185,6 +196,8 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
 			const svc = getService(ctx.cwd);
 			return textResult(moduleReport(svc, params.file, ctx.cwd));
 		},
@@ -202,6 +215,8 @@ export default function rapLens(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const pathErr = validatePaths(ctx.cwd, [params.file]);
+			if (pathErr) return textResult(pathErr);
 			const svc = getService(ctx.cwd);
 			const sym = readSymbol(svc, params.file, params.line, params.column, ctx.cwd);
 			if (!sym) return textResult("No symbol at this position (or LanguageService unavailable).");
@@ -316,7 +331,7 @@ export default function rapLens(pi: ExtensionAPI): void {
 			mark: TriageMarkSchema,
 			reason: Type.Optional(Type.String({ description: "Why this mark was applied" })),
 		}),
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: false, destructiveHint: true },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const key = diagnosticKey(params.file, params.line, params.message);

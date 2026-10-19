@@ -22,17 +22,21 @@
 #   - Targets the GLOBAL Pi install (the one the user actually runs), NOT a
 #     local node_modules copy of @earendil-works/pi-coding-agent that npm may
 #     have dropped inside this package during install (which would shadow `pi`
-#     on PATH during postinstall). It prefers `npm root -g`, then a PATH walk
+#     on PATH). It prefers `npm root -g`, then a PATH walk
 #     that skips copies under this package's own node_modules.
 #   - Non-fatal: never exits non-zero. The logo recolor is cosmetic; a failure
 #     (pi missing, permission denied, ...) is reported on stderr and skipped,
-#     so a postinstall problem can never block `npm install` / `pi install`.
+#     so logo customization is optional and cannot affect package installation.
 #
 # Usage:
-#   sh scripts/patch-pi-logo.sh            # auto-locate the global Pi install
-#
-# Re-run this after `pi update`, which restores Pi's original bundle.
+#   npm run recolor-logo                   # explicitly approve global bundle changes
+#   sh scripts/patch-pi-logo.sh --apply    # equivalent direct invocation
 set -u
+
+if [ "${1:-}" != "--apply" ]; then
+    printf '\033[1;33m rap+\033[0m %s\n' "this script modifies the global Pi installation; rerun with --apply to confirm." >&2
+    exit 2
+fi
 
 log()  { printf '\033[1;34m rap+\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m rap+\033[0m %s\n' "$*" >&2; }
@@ -44,7 +48,7 @@ SIG='rgbColor(228,138,122)'
 # Returns the chunks dir on stdout, or returns non-zero if not found.
 find_chunks_dir() {
     # (a) npm global root — the most reliable signal for the global install,
-    #     unaffected by node_modules/.bin shadowing during postinstall.
+    #     unaffected by local node_modules/.bin path shadowing.
     if command -v npm >/dev/null 2>&1; then
         groot=$(npm root -g 2>/dev/null || true)
         if [ -n "$groot" ] && [ -d "$groot/@earendil-works/pi-coding-agent/dist/bundle/chunks" ]; then
@@ -97,6 +101,13 @@ fi
 # --- 3. recolor (portable sed via temp file; works on GNU + BSD) -----------
 for f in $matches; do
     tmp=${f}.rap-plus.tmp
+    backup=${f}.rap-plus-original.bak
+    if [ ! -e "$backup" ]; then
+        if ! cp -p "$f" "$backup"; then
+            warn "could not create original backup $backup; skipping $f."
+            continue
+        fi
+    fi
     if sed \
         -e 's/rgbColor(228,138,122)/rgbColor(79,158,255)/g' \
         -e 's/rgbColor(79,142,179)/rgbColor(31,111,235)/g' \
@@ -110,6 +121,5 @@ for f in $matches; do
 done
 
 # Note: the change takes effect on the NEXT `pi` start, because the running
-# process already loaded the bundle into memory. The postinstall hook runs
-# during `pi install` (before the user's first `pi` launch), so it is seamless.
+# process already loaded the bundle into memory. Restart Pi after applying the patch.
 exit 0

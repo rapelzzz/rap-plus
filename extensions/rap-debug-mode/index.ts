@@ -47,17 +47,20 @@ export default function rapDebugMode(pi: ExtensionAPI): void {
 		name: "debug_checkpoint",
 		label: "Debug Checkpoint",
 		description:
-			"Record evidence-first debugging progress: evidence, hypotheses, probes, reproduction confirmation, the fix, and verification. Gates the fix stage behind a confirmed reproduction.",
+			"Record evidence-first debugging progress. Reproduction/verification flags require written evidence details but are self-reported and not independently verified by this tool.",
 		parameters: Type.Object({
 			stage: Type.Optional(StageSchema),
 			evidence: Type.Optional(Type.String({ description: "Runtime evidence observed (log/error/stack/assert)" })),
 			hypothesis: Type.Optional(Type.String({ description: "A falsifiable hypothesis derived from evidence" })),
 			probe: Type.Optional(Type.String({ description: "A probe run to test a hypothesis (log/assert/repro step)" })),
-			reproConfirmed: Type.Optional(Type.Boolean({ description: "Whether reproduction is confirmed deterministically" })),
+			reproConfirmed: Type.Optional(Type.Boolean({ description: "Self-reported deterministic reproduction status; include reproEvidence when true. The tool cannot verify execution." })),
+			reproEvidence: Type.Optional(Type.String({ description: "Exact reproduction steps and observed result; required when reproConfirmed is true." })),
 			fix: Type.Optional(Type.String({ description: "Description of the smallest fix applied" })),
-			verified: Type.Optional(Type.Boolean({ description: "Whether the reproduction passes after the fix" })),
+			verified: Type.Optional(Type.Boolean({ description: "Self-reported post-fix verification status; include verificationEvidence when true. The tool cannot verify execution." })),
+			verificationEvidence: Type.Optional(Type.String({ description: "Verification command/procedure and observed result; required when verified is true." })),
 		}),
-		annotations: { readOnlyHint: true },
+		// This tool persists extension state, so it is not read-only.
+		annotations: { readOnlyHint: false },
 		exposure: "model-only",
 
 		async execute(_id, params, _signal, _onUpdate, ctx) {

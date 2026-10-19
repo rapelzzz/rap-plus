@@ -66,3 +66,13 @@ test("writeLensMap writes an HTML file and returns its absolute path", () => {
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("writeLensMap rejects output paths outside project root", () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-lens-map-root-"));
+	try {
+		assert.throws(() => writeLensMap(null, dir, "../outside.html"), /outside project root/i);
+		assert.equal(fs.existsSync(path.resolve(dir, "../outside.html")), false);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});

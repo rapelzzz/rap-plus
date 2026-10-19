@@ -86,3 +86,17 @@ test("captureCpuProfile does not throw on a fast/trivial script", async () => {
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+
+test("captureCpuProfile rejects output paths outside the project before starting a process", async () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rap-ide-obs-path-"));
+	try {
+		await assert.rejects(
+			captureCpuProfile("while (true) {}", { cwd: dir, outFile: "../outside.cpuprofile" }),
+			/inside the project root/i,
+		);
+		assert.equal(fs.existsSync(path.resolve(dir, "../outside.cpuprofile")), false);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});

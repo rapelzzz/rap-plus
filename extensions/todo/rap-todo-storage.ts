@@ -111,7 +111,7 @@ export function validateRapTodoProject(
   }
 
   if (!Array.isArray(r.todos)) return { error: "todos is not an array" };
-  if (typeof r.nextId !== "number" || !Number.isFinite(r.nextId) || r.nextId < 1)
+  if (typeof r.nextId !== "number" || !Number.isSafeInteger(r.nextId) || r.nextId < 1)
     return { error: "invalid nextId" };
   if (typeof r.updatedAt !== "string") return { error: "invalid updatedAt" };
 
@@ -126,11 +126,48 @@ export function validateRapTodoProject(
   }
 
   // Validate dependency references exist.
+  const byId = new Map(todos.map((todo) => [todo.id, todo] as const));
   for (const t of todos) {
     for (const dep of t.dependencies) {
       if (!seenIds.has(dep)) return { error: `todo ${t.id} depends on missing id ${dep}` };
     }
   }
+
+  // Existing files may have been hand-edited; reject cycles during load too.
+  const colors = new Map<string, 0 | 1 | 2>();
+  const stack: string[] = [];
+  const visit = (id: string): string | null => {
+    colors.set(id, 1);
+    stack.push(id);
+    for (const dep of byId.get(id)?.dependencies ?? []) {
+      const color = colors.get(dep) ?? 0;
+      if (color === 1) return stack.slice(stack.indexOf(dep)).concat(dep).join(" -> ");
+      if (color === 0) {
+        const cycle = visit(dep);
+        if (cycle) return cycle;
+      }
+    }
+    stack.pop();
+    colors.set(id, 2);
+    return null;
+  };
+  for (const todo of todos) {
+    if ((colors.get(todo.id) ?? 0) === 0) {
+      const cycle = visit(todo.id);
+      if (cycle) return { error: `circular dependency: ${cycle}` };
+    }
+  }
+
+  const numericIds = todos
+    .map((todo) => /^\d+$/.test(todo.id) ? Number(todo.id) : 0)
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  const maxNumericId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+  if (maxNumericId >= Number.MAX_SAFE_INTEGER) {
+    return { error: "numeric todo id is outside the safe integer range" };
+  }
+  // Repair stale counters safely rather than labelling an otherwise valid user
+  // file corrupt or risking a collision on the next mutation.
+  const nextId = Math.max(r.nextId, maxNumericId + 1);
 
   const projectId =
     typeof r.projectId === "string" && r.projectId.length > 0
@@ -141,7 +178,7 @@ export function validateRapTodoProject(
     schemaVersion: RAP_TODO_SCHEMA_VERSION,
     projectId,
     projectRoot: path.resolve(projectRoot),
-    nextId: r.nextId,
+    nextId,
     todos,
     updatedAt: r.updatedAt,
   };

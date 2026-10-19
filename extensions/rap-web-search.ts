@@ -13,7 +13,9 @@
  * Approach #2 (browser automation), headless only, DuckDuckGo only.
  */
 
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
 	DEFAULT_MAX_BYTES,
@@ -45,6 +47,63 @@ interface WebSearchDetails {
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
 }
+/** Reject loopback/private/reserved IPs before browser navigation. */
+function isPublicAddress(address: string): boolean {
+	const version = isIP(address);
+	if (version === 4) {
+		const p = address.split(".").map(Number);
+		if (p.length !== 4 || p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+		const [a, b, c] = p;
+		return !(
+			a === 0 || a === 10 || a === 127 || a >= 224 ||
+			(a === 100 && b >= 64 && b <= 127) ||
+			(a === 169 && b === 254) ||
+			(a === 172 && b >= 16 && b <= 31) ||
+			(a === 192 && (b === 168 || (b === 0 && c === 0) || (b === 0 && c === 2) || (b === 88 && c === 99))) ||
+			(a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+			(a === 203 && b === 0 && c === 113)
+		);
+	}
+	if (version === 6) {
+		const a = address.toLowerCase();
+		if (a === "::" || a === "::1" || a.startsWith("::ffff:") ||
+			a.startsWith("fc") || a.startsWith("fd") ||
+			a.startsWith("fe8") || a.startsWith("fe9") || a.startsWith("fea") || a.startsWith("feb") ||
+			a.startsWith("ff") || a.startsWith("2001:db8:") || a.startsWith("2002:")) return false;
+		// Permit only assigned global-unicast space. Also reject the first
+		// reserved 2001::/23 block, which includes Teredo and ORCHID ranges.
+		const fields = a.split(":").filter(Boolean);
+		const firstWord = Number.parseInt(fields[0] ?? "0", 16);
+		const secondWord = Number.parseInt(fields[1] ?? "0", 16);
+		return firstWord >= 0x2001 && firstWord <= 0x3fff &&
+			!(firstWord === 0x2001 && secondWord <= 0x01ff);
+	}
+	return false;
+}
+
+/**
+ * Browser navigation guard. Checks every requested URL (including redirects and
+ * subresources) and fails closed if the destination cannot be resolved safely.
+ * This is defense-in-depth; Pi extensions still run with the user's OS account.
+ */
+export async function isSafeExternalUrl(value: string): Promise<boolean> {
+	let url: URL;
+	try { url = new URL(value); } catch { return false; }
+	if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+	if (url.username || url.password) return false;
+	const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+	if (!host || host === "localhost" || host.endsWith(".localhost") ||
+		host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".lan") ||
+		host.endsWith(".test") || host.endsWith(".invalid") || host.endsWith(".example")) return false;
+	if (isIP(host)) return isPublicAddress(host);
+	try {
+		const addresses = await lookup(host, { all: true, verbatim: true });
+		return addresses.length > 0 && addresses.every((entry) => isPublicAddress(entry.address));
+	} catch {
+		return false;
+	}
+}
+
 
 const WebSearchParams = Type.Object({
 	query: Type.String({ description: "The search query string" }),
@@ -117,6 +176,7 @@ export default function (pi: ExtensionAPI) {
 	// Lazily-created, session-scoped browser. Do NOT launch in the factory.
 	let browserPromise: Promise<Browser> | null = null;
 	let browser: Browser | null = null;
+	const outputDirs = new Set<string>();
 
 	const launchBrowser = async (): Promise<Browser> => {
 		if (browser) return browser;
@@ -140,6 +200,9 @@ export default function (pi: ExtensionAPI) {
 				/* ignore — already closed */
 			}
 		}
+		const dirs = [...outputDirs];
+		outputDirs.clear();
+		await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }).catch(() => {})));
 	};
 
 	pi.on("session_shutdown", async () => {
@@ -162,9 +225,10 @@ export default function (pi: ExtensionAPI) {
 
 			const b = await launchBrowser();
 			const page = await b.newPage();
+			let abortListener: (() => void) | undefined;
 			try {
 				// Honor abort signals from the active turn.
-				const abortListener = () => {
+				abortListener = () => {
 					void page.close().catch(() => {});
 				};
 				if (signal) {
@@ -209,16 +273,24 @@ export default function (pi: ExtensionAPI) {
 				let extractedText = "";
 				if (wantContent && results.length > 0 && results[0].url) {
 					const topUrl = results[0].url;
-					const contentPage = await b.newPage();
-					try {
-						await contentPage.goto(topUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
-						extractedText = await extractPageText(contentPage);
-						extractedUrl = topUrl;
-					} catch (err) {
-						extractedText = `[Failed to extract content from ${topUrl}: ${(err as Error).message}]`;
-						extractedUrl = topUrl;
-					} finally {
-						await contentPage.close().catch(() => {});
+					extractedUrl = topUrl;
+					if (!(await isSafeExternalUrl(topUrl))) {
+						extractedText = "[Content extraction blocked: target is not a public HTTP(S) URL.]";
+					} else {
+						const contentPage = await b.newPage();
+						try {
+							// Re-check every request and redirect, not only the first URL.
+							await contentPage.route("**/*", async (route) => {
+								if (await isSafeExternalUrl(route.request().url())) await route.continue();
+								else await route.abort("blockedbyclient");
+							});
+							await contentPage.goto(topUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
+							extractedText = await extractPageText(contentPage);
+						} catch (err) {
+							extractedText = `[Failed to extract content from ${topUrl}: ${(err as Error).message}]`;
+						} finally {
+							await contentPage.close().catch(() => {});
+						}
 					}
 				}
 
@@ -253,8 +325,9 @@ export default function (pi: ExtensionAPI) {
 				let resultText = truncation.content;
 				if (truncation.truncated) {
 					const tempDir = await mkdtemp(join(tmpdir(), "pi-web-search-"));
+					outputDirs.add(tempDir);
 					const tempFile = join(tempDir, "output.txt");
-					await writeFile(tempFile, text, "utf8");
+					await writeFile(tempFile, text, { encoding: "utf8", mode: 0o600 });
 
 					details.truncation = truncation;
 					details.fullOutputPath = tempFile;
@@ -267,9 +340,7 @@ export default function (pi: ExtensionAPI) {
 					details,
 				};
 			} finally {
-				if (signal) {
-					signal.removeEventListener("abort", () => {});
-				}
+				if (signal && abortListener) signal.removeEventListener("abort", abortListener);
 				await page.close().catch(() => {});
 			}
 		},

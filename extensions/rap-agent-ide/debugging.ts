@@ -75,7 +75,7 @@ export class DebugSession {
 		// `script` is a single file path — never split on whitespace, or paths
 		// containing spaces break. Extra CLI args are passed via opts.args.
 		const args = ["--inspect-brk=0", script, ...(opts.args ?? [])];
-		const proc = spawn(process.execPath, [...args, ...(opts.args ?? [])], {
+		const proc = spawn(process.execPath, args, {
 			cwd: opts.cwd,
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -94,36 +94,61 @@ export class DebugSession {
 			}
 		});
 
-		// Wait for the inspector banner.
-		const wsUrl = await new Promise<string>((resolve, reject) => {
-			const timer = setTimeout(() => reject(new Error("debug target did not expose inspector: " + stderr.join(""))), opts.timeoutMs ?? 8000);
-			const check = () => {
-				const url = parseInspectUrl(stderr.join(""));
-				if (url) {
-					clearTimeout(timer);
-					resolve(url);
-				} else {
-					setTimeout(check, 50);
-				}
-			};
-			check();
-		});
-		await new Promise((r) => setTimeout(r, 150));
+		try {
+			// Wait for the inspector banner. Track both timers and child exit so
+			// startup failure never leaves a poll timer or debug process running.
+			const wsUrl = await new Promise<string>((resolve, reject) => {
+				let timeout: NodeJS.Timeout | undefined;
+				let poll: NodeJS.Timeout | undefined;
+				let settled = false;
+				const cleanup = () => {
+					if (timeout) clearTimeout(timeout);
+					if (poll) clearTimeout(poll);
+					proc.removeListener("exit", onExit);
+				};
+				const fail = (error: Error) => {
+					if (settled) return;
+					settled = true;
+					cleanup();
+					reject(error);
+				};
+				const onExit = () => fail(new Error("debug target exited before inspector banner: " + stderr.join("")));
+				const check = () => {
+					if (settled) return;
+					const url = parseInspectUrl(stderr.join(""));
+					if (url) {
+						settled = true;
+						cleanup();
+						resolve(url);
+					} else if (session.exited || proc.exitCode !== null || proc.signalCode !== null) {
+						fail(new Error("debug target exited before inspector banner: " + stderr.join("")));
+					} else {
+						poll = setTimeout(check, 50);
+					}
+				};
+				timeout = setTimeout(() => fail(new Error("debug target did not expose inspector: " + stderr.join(""))), opts.timeoutMs ?? 8000);
+				proc.once("exit", onExit);
+				check();
+			});
+			await new Promise((r) => setTimeout(r, 150));
 
-		const client = await CdpClient.connect(wsUrl, { timeoutMs: 5000 });
-		session.client = client;
-		client.on("Debugger.paused", (params) => session.handlePaused(params as PausedEventParams));
-		client.on("Debugger.scriptParsed", (params: unknown) => {
-			const p = params as { scriptId: string; url?: string };
-			if (p.url) session.scriptUrlToId.set(p.url, p.scriptId);
-		});
-		await client.send("Runtime.enable", {});
-		await client.send("Debugger.enable", {});
-		// --inspect-brk waits for a debugger; this starts the target and triggers
-		// the break-on-start pause (line 1), which waitForPause then awaits.
-		await client.send("Runtime.runIfWaitingForDebugger", {});
-		await session.waitForPause(opts.timeoutMs ?? 8000);
-		return session;
+			const client = await CdpClient.connect(wsUrl, { timeoutMs: 5000 });
+			session.client = client;
+			client.on("Debugger.paused", (params) => session.handlePaused(params as PausedEventParams));
+			client.on("Debugger.scriptParsed", (params: unknown) => {
+				const p = params as { scriptId: string; url?: string };
+				if (p.url) session.scriptUrlToId.set(p.url, p.scriptId);
+			});
+			await client.send("Runtime.enable", {});
+			await client.send("Debugger.enable", {});
+			await client.send("Runtime.runIfWaitingForDebugger", {});
+			const paused = await session.waitForPause(opts.timeoutMs ?? 8000);
+			if (!paused.paused) throw new Error(`debug target did not pause at entry: ${paused.reason}`);
+			return session;
+		} catch (error) {
+			await session.stop();
+			throw error;
+		}
 	}
 
 	private handlePaused(params: PausedEventParams): void {

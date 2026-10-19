@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { isSensitivePath, relFrom, validateEdit, validateEditTarget } from "../guard.ts";
+import { isSensitivePath, relFrom, validateEdit, validateEditTarget, validateEditInputShape } from "../guard.ts";
 import { formatHits, parseRipgrep } from "../search.ts";
 
 // ── guard: path safety ──────────────────────────────────────────────────────
@@ -91,4 +91,27 @@ test("formatHits truncates beyond max", () => {
 	assert.equal(hits.length, 60);
 	const text = formatHits(hits, 10);
 	assert.match(text, /more/);
+});
+
+
+test("validateEditTarget blocks the entire .git metadata directory", () => {
+	const cwd = "/root/project";
+	assert.equal(validateEditTarget(cwd, ".git/config", "x").ok, false);
+	assert.equal(validateEditTarget(cwd, ".git/hooks/pre-commit", "x").ok, false);
+});
+
+test("guarded edit detects Windows-style sensitive paths", () => {
+	const cwd = "/root/project";
+	assert.equal(validateEditTarget(cwd, ".git\\config", "x").ok, false);
+	assert.equal(validateEditTarget(cwd, ".env.production", "x").ok, false);
+});
+
+test("validateEditInputShape rejects malformed edit and missing write content", () => {
+	assert.match(validateEditInputShape({ old_text: "before" }) ?? "", /both old_text and new_text/i);
+	assert.match(validateEditInputShape({ new_text: "after" }) ?? "", /both old_text and new_text/i);
+	assert.match(validateEditInputShape({}) ?? "", /content is required/i);
+	assert.match(validateEditInputShape({ old_text: "", new_text: "after" }) ?? "", /old_text must not be empty/i);
+	assert.match(validateEditInputShape({ old_text: "before", new_text: "after", content: "other" }) ?? "", /content alone/i);
+	assert.equal(validateEditInputShape({ content: "" }), null);
+	assert.equal(validateEditInputShape({ old_text: "before", new_text: "after" }), null);
 });

@@ -61,12 +61,31 @@ export default function rapCodeReview(pi: ExtensionAPI): void {
 	const editedThisTurn = new Set<string>();
 	let lastEdited: string[] = [];
 
-	// Edit tracking: collect files written/edited this turn (successful only).
+	// Track every first-party RAP+ tool that can mutate source files, not
+	// only Pi's built-in write/edit tools.
 	pi.on("tool_result", async (event) => {
 		if (event.isError) return;
-		if (event.toolName === "write" || event.toolName === "edit") {
-			const p = event.input.file_path ?? event.input.path;
-			if (typeof p === "string" && p) editedThisTurn.add(p);
+		const input = event.input as Record<string, unknown>;
+		const p = input.file_path ?? input.path ?? input.file;
+		if (typeof p === "string" && p && ["write", "edit", "ide_edit_guarded", "lens_autofix"].includes(event.toolName)) {
+			editedThisTurn.add(p);
+			return;
+		}
+		if (event.toolName === "lens_ast_grep_replace" && Array.isArray(input.paths)) {
+			for (const candidate of input.paths) if (typeof candidate === "string" && candidate) editedThisTurn.add(candidate);
+			if (input.paths.length === 0) editedThisTurn.add(".");
+			return;
+		}
+		if (event.toolName === "lens_autofix" && typeof p !== "string") {
+			editedThisTurn.add(".");
+			return;
+		}
+		// A shell/terminal/subagent command can change files without exposing
+		// paths in structured arguments; mark the project root for broad review.
+		if (event.toolName === "bash" || event.toolName === "subagent" ||
+			["ide_debug_run", "ide_debug", "ide_cpu_profile"].includes(event.toolName) ||
+			(event.toolName === "ide_terminal" && input.action === "send")) {
+			editedThisTurn.add(".");
 		}
 	});
 
@@ -92,7 +111,13 @@ export default function rapCodeReview(pi: ExtensionAPI): void {
 		description: "Review changed code with severity-tagged findings. Options: --staged, --ref=<branch>, or file paths.",
 		handler: async (args, ctx) => {
 			const argv = args.trim().split(/\s+/).filter(Boolean);
-			const opts = parseDiffArgs(argv);
+			let opts: ReturnType<typeof parseDiffArgs>;
+			try {
+				opts = parseDiffArgs(argv);
+			} catch (error) {
+				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+				return;
+			}
 
 			const result = await runSubprocess("git", ["diff", ...buildDiffArgs(opts)], {
 				cwd: ctx.cwd,

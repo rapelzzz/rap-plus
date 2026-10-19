@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test 'extensions/**/*.test.ts'",
     "test:integration": "node --test 'extensions/**/tests/integration*.test.ts'",
-    "postinstall": "sh scripts/patch-pi-logo.sh"
+    "recolor-logo": "sh scripts/patch-pi-logo.sh --apply"
   },
   "files": [
     "extensions/",
