@@ -94,17 +94,26 @@ export default function rapAgentIde(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: false },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const isEdit = params.old_text !== undefined && params.new_text !== undefined;
+			const hasOldText = params.old_text !== undefined;
+			const hasNewText = params.new_text !== undefined;
+			const isEdit = hasOldText && hasNewText;
+			if (hasOldText !== hasNewText) {
+				return { content: [{ type: "text", text: "Blocked: old_text and new_text must be provided together for edit mode." }], details: undefined, isError: true };
+			}
+			if (!isEdit && params.content === undefined) {
+				return { content: [{ type: "text", text: "Blocked: content is required for write mode." }], details: undefined, isError: true };
+			}
 			const guard = isEdit
 				? validateEdit(ctx.cwd, params.file_path, params.old_text ?? "", params.new_text ?? "")
 				: validateEditTarget(ctx.cwd, params.file_path, params.content ?? "");
 			if (!guard.ok) return { content: [{ type: "text", text: `Blocked: ${guard.reason}` }], details: undefined };
 			const abs = guard.absPath!;
-			if (ctx.ui?.confirm) {
-				const verb = isEdit ? "edit" : "write";
-				const ok = await ctx.ui.confirm("rap-agent-ide", `${verb} ${relFrom(ctx.cwd, abs)}?`);
-				if (!ok) return { content: [{ type: "text", text: "Edit cancelled by user." }], details: undefined };
+			if (!ctx.hasUI || !ctx.ui?.confirm) {
+				return { content: [{ type: "text", text: "Blocked: interactive confirmation is required for file mutations." }], details: undefined, isError: true };
 			}
+			const verb = isEdit ? "edit" : "write";
+			const ok = await ctx.ui.confirm("rap-agent-ide", `${verb} ${relFrom(ctx.cwd, abs)}?`);
+			if (!ok) return { content: [{ type: "text", text: "Edit cancelled by user." }], details: undefined };
 			try {
 				if (isEdit) {
 					const existing = await fs.readFile(abs, "utf8");
