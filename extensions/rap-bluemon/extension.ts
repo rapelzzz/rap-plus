@@ -164,6 +164,9 @@ const KIMI_SNAPSHOT_MAX_AGE_MS = 10 * 60_000;
 export const RAP_BLUEMON_AUTOMATIC_THEME_SETTING =
   "rap-bluemon";
 
+/** Rap-owned canonical theme store (global, applies to every new session). */
+const RAP_THEME_FILE = "rap-theme-bluemon.json";
+
 export interface PiThemeSettingResult {
   success: boolean;
   error?: string;
@@ -216,6 +219,18 @@ function sameLiveUsage(
 }
 
 export function readPiThemeSetting(agentDir = getAgentDir()): string | undefined {
+  // Canonical rap-owned store (rap-theme-bluemon.json); fall back to Pi's
+  // settings.json.theme for backward compatibility with pre-move installs.
+  try {
+    const rapParsed: unknown = JSON.parse(
+      fs.readFileSync(path.join(agentDir, RAP_THEME_FILE), "utf-8"),
+    );
+    if (isRecord(rapParsed) && typeof rapParsed.theme === "string") {
+      return rapParsed.theme;
+    }
+  } catch {
+    /* fall through to settings.json */
+  }
   try {
     const parsed: unknown = JSON.parse(
       fs.readFileSync(path.join(agentDir, "settings.json"), "utf-8"),
@@ -232,34 +247,35 @@ export function writePiThemeSetting(
   themeSetting: string | undefined,
   agentDir = getAgentDir(),
 ): PiThemeSettingResult {
-  const settingsPath = path.join(agentDir, "settings.json");
+  // Canonical rap-owned store: rap-theme-bluemon.json. We no longer write Pi's
+  // settings.json.theme — the theme is applied each new session from this file
+  // via the session_start handler (see `applyRapThemeOnStart`). settings.json.theme
+  // is only read as a backward-compat fallback (see readPiThemeSetting).
+  const rapThemePath = path.join(agentDir, RAP_THEME_FILE);
   let temporaryPath: string | undefined;
   try {
-    let settings: Record<string, unknown> = {};
+    let rapTheme: Record<string, unknown> = {};
     try {
-      const parsed: unknown = JSON.parse(
-        fs.readFileSync(settingsPath, "utf-8"),
+      const rapParsed: unknown = JSON.parse(
+        fs.readFileSync(rapThemePath, "utf-8"),
       );
-      if (!isRecord(parsed)) {
-        throw new Error("settings.json must contain an object");
-      }
-      settings = parsed;
+      if (isRecord(rapParsed)) rapTheme = rapParsed;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
 
-    const nextSettings = { ...settings };
-    if (themeSetting === undefined) delete nextSettings.theme;
-    else nextSettings.theme = themeSetting;
+    const nextRapTheme = { ...rapTheme };
+    if (themeSetting === undefined) delete nextRapTheme.theme;
+    else nextRapTheme.theme = themeSetting;
 
     fs.mkdirSync(agentDir, { recursive: true });
-    temporaryPath = `${settingsPath}.${process.pid}.${Date.now()}.tmp`;
+    temporaryPath = `${rapThemePath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(
       temporaryPath,
-      JSON.stringify(nextSettings, null, 2),
+      JSON.stringify(nextRapTheme, null, 2),
       "utf-8",
     );
-    fs.renameSync(temporaryPath, settingsPath);
+    fs.renameSync(temporaryPath, rapThemePath);
     temporaryPath = undefined;
     return { success: true };
   } catch (error) {
@@ -272,8 +288,25 @@ export function writePiThemeSetting(
     }
     return {
       success: false,
-      error: `Could not update ${settingsPath}: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Could not update ${rapThemePath}: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+}
+
+/**
+ * Apply the rap-owned theme on every new session so it auto-loads from
+ * `rap-theme-bluemon.json`. No-op when the file is absent or the theme is
+ * already active. Never throws — theme I/O must not block session setup.
+ */
+function applyRapThemeOnStart(ctx: { hasUI: boolean; ui: { theme: { name?: string }; getTheme(name: string): unknown; setTheme(name: string): { success: boolean } } }): void {
+  if (!ctx.hasUI) return;
+  try {
+    const saved = readPiThemeSetting();
+    if (!saved || ctx.ui.theme.name === saved) return;
+    if (!ctx.ui.getTheme(saved)) return;
+    ctx.ui.setTheme(saved);
+  } catch {
+    /* never block session setup */
   }
 }
 
@@ -1213,6 +1246,8 @@ export function registerRapBluemonExtension(
         console.warn("[rap+] logo patch skipped:", (e as Error).message);
       }
     });
+    // Auto-load the rap-owned theme from rap-theme-bluemon.json each new session.
+    applyRapThemeOnStart(ctx);
     const identityKey = identityOf(ctx);
     consoleBridgeOwnerRevision += 1;
     if (isInteractive(ctx)) {
