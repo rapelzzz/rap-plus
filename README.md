@@ -5,7 +5,7 @@
 <h1 align="center">rap-plus</h1>
 
 <p align="center">
-  A polished <a href="https://pi.dev">Pi</a> package — twelve extensions, a vivid cobalt-blue theme, and a full agent-IDE toolset built for the RAP workflow.
+  A polished <a href="https://pi.dev">Pi</a> package — thirteen extensions, a vivid cobalt-blue theme, and a full agent-IDE toolset built for the RAP workflow.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@ rap-plus extends Pi with planning, delegation, code intelligence, evidence-first
 
 ## Highlights
 
-- **12 extensions + 1 theme**, all registered automatically on install
+- **13 extensions + 1 theme**, all registered automatically on install
 - **Vivid cobalt-blue theme** (`rap-bluemon`) with automatic Pi-logo recolor — runs at install via `postinstall` and self-heals at runtime after `pi update`
 - **Safety-first design** — read-only planning mode, reproduction-gated fixes, guarded edits, depth-limited subagents, read-only review
 - **161 passing tests** across shared utilities and all 10 extensions
@@ -73,7 +73,7 @@ The Pi startup logo (`▀▀█` / "Pi" wordmark) uses hardcoded brand colors an
 Toggleable read-only planning mode. When active, edit/write tools are removed from the active set and destructive bash commands are blocked via the `tool_call` event. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` and the `--plan` flag.
 
 ### rap-subagents — `subagent` tool
-Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and the nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`.
+Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and the nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), allowlisted runtime/model-provider environment, stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`.
 
 ### rap-simplify — `/rap-simplify`
 Detects files changed via `git diff`, builds a scoped simplification review instruction, and sends it to the session agent. Shared git-diff parsing lives in `extensions/_shared/git-diff.ts`. Regression-safe — no silent edits.
@@ -106,7 +106,7 @@ Per-extension on/off toggle for provider-quota savings. Each tool-bearing extens
 ## Safety invariants
 
 - **rap-plan-mode** — blocks writes (removes edit/write tools via `setActiveTools`) and destructive bash (via `tool_call`).
-- **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, no credential propagation.
+- **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, and an allowlisted child-process environment for model-provider configuration.
 - **rap-code-review** — read-only; never edits or publishes.
 - **rap-lens** — `lens_*` navigation/symbol/search tools are `readOnlyHint`; `lens_ast_grep_replace` and `lens_autofix` are mutating and clearly labeled.
 - **rap-debug-mode** — fix stage blocked until reproduction is confirmed.
@@ -121,7 +121,6 @@ Per-extension on/off toggle for provider-quota savings. Each tool-bearing extens
 
 ```sh
 npm test            # 161 passing tests
-npm run test:integration   # integration smoke tests (real git)
 npx tsc --noEmit    # typecheck (12 pre-existing baseline errors in rap-web-search.ts DOM types)
 ```
 
