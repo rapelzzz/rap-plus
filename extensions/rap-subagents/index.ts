@@ -33,6 +33,7 @@ import {
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { redactSecrets } from "../_shared/safety.ts";
+import { buildSubagentEnv } from "../_shared/subagent-env.ts";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
 const MAX_PARALLEL_TASKS = 8;
@@ -57,25 +58,6 @@ export function currentDepth(): number {
 	return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-const CHILD_ENV_ALLOWLIST = new Set([
-	"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM", "NO_COLOR", "FORCE_COLOR", "CI",
-	"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
-	"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY",
-	"XAI_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "COHERE_API_KEY",
-	"FIREWORKS_API_KEY", "TOGETHER_API_KEY", "CEREBRAS_API_KEY", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
-	"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_REGION", "AWS_DEFAULT_REGION",
-]);
-
-/** Build the child environment from runtime essentials and known model-provider configuration only. */
-export function buildSubagentEnv(source: NodeJS.ProcessEnv, depth: number): Record<string, string> {
-	const child: Record<string, string> = {};
-	for (const [key, value] of Object.entries(source)) {
-		if (value === undefined) continue;
-		if (CHILD_ENV_ALLOWLIST.has(key) || key.startsWith("PI_")) child[key] = value;
-	}
-	child.RAP_SUBAGENT_DEPTH = String(depth);
-	return child;
-}
 
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
