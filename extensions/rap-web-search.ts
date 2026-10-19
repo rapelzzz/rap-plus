@@ -68,21 +68,15 @@ const WebSearchParams = Type.Object({
  */
 function resolveResultUrl(href: string): string {
 	if (!href) return "";
-	// Normalize protocol-relative URLs
 	const normalized = href.startsWith("//") ? `https:${href}` : href;
 	try {
-		const u = new URL(normalized);
-		const uddg = u.searchParams.get("uddg");
-		if (uddg) {
-			try {
-				return decodeURIComponent(uddg);
-			} catch {
-				return uddg;
-			}
-		}
-		return normalized;
+		const wrapper = new URL(normalized);
+		const target = wrapper.searchParams.get("uddg") ?? normalized;
+		const resolved = new URL(target);
+		if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return "";
+		return resolved.href;
 	} catch {
-		return normalized;
+		return "";
 	}
 }
 
