@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/rapelzzz/rap-plus"><img alt="Pi package" src="https://img.shields.io/badge/Pi-extension-1F6FEB"></a>
   <a href="#requirements"><img alt="Node.js" src="https://img.shields.io/badge/node-%E2%89%A522.19-339933?logo=node.js&logoColor=white"></a>
-  <a href="#tests"><img alt="tests" src="https://img.shields.io/badge/tests-161%20passing-brightgreen"></a>
+  <a href="#tests"><img alt="tests" src="https://img.shields.io/badge/tests-167%20passing-brightgreen"></a>
   <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="last commit" src="https://img.shields.io/github/last-commit/rapelzzz/rap-plus">
 </p>
@@ -108,7 +108,7 @@ Per-extension on/off toggle for provider-quota savings. Each tool-bearing extens
 - **rap-plan-mode** — removes tools annotated as mutating, blocks mutation-capable terminal/debug/profile/subagent tools at `tool_call`, and allowlists bash.
 - **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, and an allowlisted child-process environment for model-provider configuration.
 - **rap-code-review** — read-only; never edits or publishes.
-- **rap-lens** — `lens_*` navigation/symbol/search tools are `readOnlyHint`; `lens_ast_grep_replace` and `lens_autofix` are mutating and clearly labeled.
+- **rap-lens** — navigation/symbol/search tools are read-only; `lens_diagnostic_mark` mutates triage state, while `lens_ast_grep_replace` and `lens_autofix` are mutating code tools.
 - **rap-debug-mode** — fix stage blocked until reproduction is confirmed.
 - **rap-agent-ide** — guarded edits require interactive confirmation and reject empty-file truncation; CPU profile and module-map outputs are constrained to the project root; terminal/debug sessions are cleaned up on shutdown.
 
