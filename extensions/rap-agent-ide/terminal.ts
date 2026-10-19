@@ -103,6 +103,11 @@ export class TerminalPool {
 			lastCommand: "",
 			maxBuffer,
 		};
+		// Shells can exit between send() calls; Node reports broken stdin pipes
+		// asynchronously as EPIPE, which must not become an uncaught exception.
+		proc.stdin.on("error", () => {
+			state.alive = false;
+		});
 		const appendCapped = (buf: string, chunk: Buffer): string => truncateOutput(buf + chunk.toString("utf8"), maxBuffer);
 		proc.stdout.on("data", (chunk: Buffer) => { state.stdout = appendCapped(state.stdout, chunk); });
 		proc.stderr.on("data", (chunk: Buffer) => { state.stderr = appendCapped(state.stderr, chunk); });
