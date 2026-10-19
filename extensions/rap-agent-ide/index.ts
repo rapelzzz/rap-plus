@@ -33,6 +33,19 @@ export default function rapAgentIde(pi: ExtensionAPI): void {
 	const terminals = new TerminalPool();
 	const debugSessions = new Map<string, DebugSession>();
 
+	pi.on("session_shutdown", async () => {
+		for (const terminal of terminals.list()) terminals.kill(terminal.id);
+		for (const [id, session] of debugSessions) {
+			try {
+				await session.stop();
+			} catch {
+				// Continue cleaning up remaining sessions if one target already exited.
+			} finally {
+				debugSessions.delete(id);
+			}
+		}
+	});
+
 	pi.registerTool({
 		name: "ide_search",
 		label: "IDE Search",
