@@ -222,7 +222,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 You are in rap-plan-mode — a read-only exploration mode.
 
 Restrictions (enforced at the tool layer):
-- edit and write tools are disabled
+- tools marked mutating are disabled, including terminal/debug/profile and subagent mutation paths
 - bash is restricted to an allowlist of read-only commands
 
 Ask clarifying questions using the questionnaire tool.
