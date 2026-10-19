@@ -126,7 +126,9 @@ npm run typecheck   # TypeScript typecheck
 
 Unit tests cover shared utilities and extension behavior. Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
 
-`rap-todo` persists project todo items in its own storage; `rap-plan-mode` persists branch-aware plan progress in Pi session entries. These stores are intentionally separate.\n\n## Manage
+`rap-todo` persists project todo items in its own storage; `rap-plan-mode` persists branch-aware plan progress in Pi session entries. These stores are intentionally separate.
+
+## Manage
 
 ```sh
 pi list                       # show registered packages
