@@ -57,6 +57,26 @@ export function currentDepth(): number {
 	return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
+const CHILD_ENV_ALLOWLIST = new Set([
+	"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TERM", "NO_COLOR", "FORCE_COLOR", "CI",
+	"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
+	"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY",
+	"XAI_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "COHERE_API_KEY",
+	"FIREWORKS_API_KEY", "TOGETHER_API_KEY", "CEREBRAS_API_KEY", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+	"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_REGION", "AWS_DEFAULT_REGION",
+]);
+
+/** Build the child environment from runtime essentials and known model-provider configuration only. */
+export function buildSubagentEnv(source: NodeJS.ProcessEnv, depth: number): Record<string, string> {
+	const child: Record<string, string> = {};
+	for (const [key, value] of Object.entries(source)) {
+		if (value === undefined) continue;
+		if (CHILD_ENV_ALLOWLIST.has(key) || key.startsWith("PI_")) child[key] = value;
+	}
+	child.RAP_SUBAGENT_DEPTH = String(depth);
+	return child;
+}
+
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
 	if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
@@ -303,7 +323,7 @@ async function runSingleAgent(
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 
 	// Propagate incremented depth to the child to bound recursive delegation.
-	const childEnv = { ...process.env, RAP_SUBAGENT_DEPTH: String(currentDepth() + 1) };
+	const childEnv = buildSubagentEnv(process.env, currentDepth() + 1);
 
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;
@@ -531,7 +551,6 @@ export default function rapSubagents(pi: ExtensionAPI) {
 			};
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
-			const confirmProjectAgents = params.confirmProjectAgents ?? true;
 
 			const hasChain = (params.chain?.length ?? 0) > 0;
 			const hasTasks = (params.tasks?.length ?? 0) > 0;
@@ -557,8 +576,6 @@ export default function rapSubagents(pi: ExtensionAPI) {
 
 			if (
 				(agentScope === "project" || agentScope === "both") &&
-				confirmProjectAgents &&
-				ctx.hasUI &&
 				!ctx.isProjectTrusted()
 			) {
 				const requestedAgentNames = new Set<string>();
@@ -571,6 +588,13 @@ export default function rapSubagents(pi: ExtensionAPI) {
 					.filter((a): a is AgentConfig => a?.source === "project");
 
 				if (projectAgentsRequested.length > 0) {
+					if (!ctx.hasUI) {
+						return {
+							content: [{ type: "text", text: "Refused: project-local agents require interactive trust confirmation in an untrusted repository." }],
+							details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
+							isError: true,
+						};
+					}
 					const names = projectAgentsRequested.map((a) => a.name).join(", ");
 					const dir = discovery.projectAgentsDir ?? "(unknown)";
 					const ok = await ctx.ui.confirm(
