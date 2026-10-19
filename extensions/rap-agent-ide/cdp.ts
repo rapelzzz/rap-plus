@@ -96,9 +96,9 @@ export class CdpClient {
 			}
 			this.pending.clear();
 		});
-		ws.addEventListener("error", (ev: ErrorEvent) => {
+		ws.addEventListener("error", (ev: Event) => {
 			// Surface errors by rejecting pending commands; otherwise silent.
-			const msg = ev.message || "CDP WebSocket error";
+			const msg = "message" in ev && typeof ev.message === "string" ? ev.message : "CDP WebSocket error";
 			for (const [, p] of this.pending) {
 				clearTimeout(p.timer);
 				p.reject(new Error(msg));
@@ -128,9 +128,10 @@ export class CdpClient {
 				clearTimeout(timer);
 				resolve(new CdpClient(ws));
 			});
-			ws.addEventListener("error", (ev: ErrorEvent) => {
+			ws.addEventListener("error", (ev: Event) => {
 				clearTimeout(timer);
-				reject(new Error(ev.message || `CDP connect failed: ${url}`));
+				const message = "message" in ev && typeof ev.message === "string" ? ev.message : `CDP connect failed: ${url}`;
+				reject(new Error(message));
 			});
 		});
 	}
