@@ -11,6 +11,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { isPathSafe } from "../_shared/safety.ts";
 import * as ts from "typescript";
 import { TsLanguageService, offsetToLineCol } from "./lsp.ts";
 
@@ -173,6 +174,10 @@ function flattenNavBar(items: ts.NavigationBarItem[], content: string): ModuleNo
 
 /** Build the map and write it to `outFile`. Returns the absolute output path. */
 export function writeLensMap(svc: TsLanguageService | null, cwd: string, outFile: string): string {
+	const hasTraversal = outFile.split(/[\\/]/).includes("..");
+	if (!outFile || path.isAbsolute(outFile) || hasTraversal || !isPathSafe(cwd, outFile)) {
+		throw new Error(`Refusing module-map output path outside the project root: ${outFile}`);
+	}
 	const data = buildLensMapData(svc, cwd);
 	const html = renderLensMapHtml(data, cwd);
 	const abs = path.resolve(cwd, outFile);
