@@ -316,7 +316,7 @@ export default function rapLens(pi: ExtensionAPI): void {
 			mark: TriageMarkSchema,
 			reason: Type.Optional(Type.String({ description: "Why this mark was applied" })),
 		}),
-		annotations: { readOnlyHint: true },
+		annotations: { readOnlyHint: false },
 		exposure: "model-only",
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const key = diagnosticKey(params.file, params.line, params.message);
