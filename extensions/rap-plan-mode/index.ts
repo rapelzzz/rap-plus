@@ -177,7 +177,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 			if (!isSafeCommand(command)) {
 				return {
 					block: true,
-					reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\\nCommand: ${command}`,
+					reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\nCommand: ${command}`,
 				};
 			}
 			return;
@@ -185,7 +185,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		if (getPlanModeDisabledTools().has(event.toolName)) {
 			return {
 				block: true,
-				reason: `rap-plan-mode: mutating tool \"${event.toolName}\" is disabled while planning. Disable with /plan first.`,
+				reason: `rap-plan-mode: mutating tool "${event.toolName}" is disabled while planning. Disable with /plan first.`,
 			};
 		}
 	});
