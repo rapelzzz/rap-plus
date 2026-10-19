@@ -1,8 +1,7 @@
 /**
  * rap-plan-mode — read-only planning mode for Pi.
  *
- * Toggleable read-only mode that TECHNICALLY blocks write/edit tools (via
- * setActiveTools) and destructive bash (via tool_call handler). Supports
+ * Toggleable read-only mode that removes mutating tools from the active set and blocks them at tool_call, while restricting bash to an allowlist. Supports
  * numbered plan extraction, [DONE:n] progress tracking, a progress widget,
  * session persistence, a shortcut, and a `--plan` startup flag.
  *
@@ -139,7 +138,7 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 
 		if (planModeEnabled) {
 			enablePlanModeTools();
-			ctx.ui.notify("rap-plan-mode enabled. Write/edit tools disabled.");
+			ctx.ui.notify("rap-plan-mode enabled. Mutating tools disabled; bash is allowlisted.");
 		} else {
 			restoreNormalModeTools();
 			ctx.ui.notify("rap-plan-mode disabled. Full access restored.");
