@@ -105,12 +105,12 @@ Per-extension on/off toggle for provider-quota savings. Each tool-bearing extens
 
 ## Safety invariants
 
-- **rap-plan-mode** — blocks writes (removes edit/write tools via `setActiveTools`) and destructive bash (via `tool_call`).
+- **rap-plan-mode** — removes tools annotated as mutating, blocks mutation-capable terminal/debug/profile/subagent tools at `tool_call`, and allowlists bash.
 - **rap-subagents** — depth limit (3), concurrency caps, abort on signal, stderr redaction, trust gating, and an allowlisted child-process environment for model-provider configuration.
 - **rap-code-review** — read-only; never edits or publishes.
 - **rap-lens** — `lens_*` navigation/symbol/search tools are `readOnlyHint`; `lens_ast_grep_replace` and `lens_autofix` are mutating and clearly labeled.
 - **rap-debug-mode** — fix stage blocked until reproduction is confirmed.
-- **rap-agent-ide** — guarded edit validates path safety and blocks sensitive paths with interactive confirm; `ide_search`/`ide_diff`/`ide_system_metrics` are read-only; terminal sessions are capped (8), debug sessions killed on stop.
+- **rap-agent-ide** — guarded edits require interactive confirmation and reject empty-file truncation; CPU profile and module-map outputs are constrained to the project root; terminal/debug sessions are cleaned up on shutdown.
 
 ## Requirements
 
