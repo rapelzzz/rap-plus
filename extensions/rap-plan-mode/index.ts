@@ -84,8 +84,23 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		return new Set(all.map((t) => (typeof t === "string" ? t : (t as { name?: string }).name ?? "")));
 	}
 
+	function getPlanModeDisabledTools(): Set<string> {
+		const tools = pi.getAllTools() as Array<{ name?: string; annotations?: { readOnlyHint?: boolean } }>;
+		const annotatedMutators = tools
+			.filter((tool) => tool.annotations?.readOnlyHint === false && typeof tool.name === "string")
+			.map((tool) => tool.name!);
+		return new Set([
+			...PLAN_MODE_DISABLED_TOOLS,
+			...annotatedMutators,
+			// These capabilities can mutate or delegate mutations even when their
+			// metadata is incomplete or they are implemented by another extension.
+			"ide_terminal", "ide_debug_run", "ide_cpu_profile",
+			"lens_ast_grep_replace", "lens_autofix", "subagent",
+		]);
+	}
+
 	function getPlanModeTools(activeToolNames: string[]): string[] {
-		return uniqueToolNames(resolvePlanModeTools(activeToolNames, PLAN_MODE_TOOLS, registeredToolNames(), PLAN_MODE_DISABLED_TOOLS));
+		return uniqueToolNames(resolvePlanModeTools(activeToolNames, PLAN_MODE_TOOLS, registeredToolNames(), getPlanModeDisabledTools()));
 	}
 
 	function getNormalModeTools(activeToolNames: string[]): string[] {
@@ -155,14 +170,23 @@ export default function rapPlanMode(pi: ExtensionAPI): void {
 		handler: async (ctx) => togglePlanMode(ctx),
 	});
 
-	// TECHNICAL SAFETY GATE: block destructive bash while planning.
+	// TECHNICAL SAFETY GATE: block mutating tools and restrict bash while planning.
 	pi.on("tool_call", async (event) => {
-		if (!planModeEnabled || event.toolName !== "bash") return;
-		const command = event.input.command as string;
-		if (!isSafeCommand(command)) {
+		if (!planModeEnabled) return;
+		if (event.toolName === "bash") {
+			const command = String(event.input.command ?? "");
+			if (!isSafeCommand(command)) {
+				return {
+					block: true,
+					reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\\nCommand: ${command}`,
+				};
+			}
+			return;
+		}
+		if (getPlanModeDisabledTools().has(event.toolName)) {
 			return {
 				block: true,
-				reason: `rap-plan-mode: command not allowlisted. Disable with /plan first.\nCommand: ${command}`,
+				reason: `rap-plan-mode: mutating tool \"${event.toolName}\" is disabled while planning. Disable with /plan first.`,
 			};
 		}
 	});
