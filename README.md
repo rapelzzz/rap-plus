@@ -70,7 +70,7 @@ The Pi startup logo (`▀▀█` / "Pi" wordmark) uses hardcoded brand colors an
 ## Extensions
 
 ### rap-plan-mode — `/rap-plan`, `/rap-todos`
-Toggleable read-only planning mode. When active, edit/write tools are removed from the active set and destructive bash commands are blocked via the `tool_call` event. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` and the `--plan` flag.
+Toggleable read-only planning mode. When active, tools marked mutating (plus terminal/debug/profile/subagent mutators) are removed from the active set and blocked at the `tool_call` boundary; bash is allowlisted. Shows a plan widget with `[DONE:n]` progress, persists plans, and supports `Ctrl+Alt+P` and the `--plan` flag.
 
 ### rap-subagents — `subagent` tool
 Delegate tasks to other Pi agents with isolated context windows. One tool, three modes: single (`{ agent, task }`), parallel (`{ tasks: [...] }`, max 8 / 4 concurrent), and chain (`{ chain: [...] }`, max depth 3). Agent discovery from `~/.pi/agent/agents` and the nearest `.pi/agents`. Safety: depth-limit env propagation (`RAP_SUBAGENT_DEPTH`), allowlisted runtime/model-provider environment, stderr redaction, trust gating for project agents, abort via `SIGTERM`→`SIGKILL`.
@@ -120,13 +120,13 @@ Per-extension on/off toggle for provider-quota savings. Each tool-bearing extens
 ## Tests
 
 ```sh
-npm test            # 161 passing tests
-npx tsc --noEmit    # typecheck (12 pre-existing baseline errors in rap-web-search.ts DOM types)
+npm test            # unit tests
+npm run typecheck   # TypeScript typecheck
 ```
 
-161 passing tests across shared utilities and all 10 extensions. Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
+Unit tests cover shared utilities and extension behavior. Shared utilities in `extensions/_shared/` are pure (no Pi imports) for unit testability with `node --test`.
 
-## Manage
+`rap-todo` persists project todo items in its own storage; `rap-plan-mode` persists branch-aware plan progress in Pi session entries. These stores are intentionally separate.\n\n## Manage
 
 ```sh
 pi list                       # show registered packages
