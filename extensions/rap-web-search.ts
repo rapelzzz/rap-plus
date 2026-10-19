@@ -27,6 +27,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { Type } from "typebox";
 import type { Browser } from "playwright";
+import { normalizeHttpUrl } from "./_shared/url-safety.ts";
 
 /** A single DuckDuckGo search result. */
 interface SearchResult {
@@ -66,15 +67,13 @@ const WebSearchParams = Type.Object({
  * DuckDuckGo HTML wraps result links as "//duckduckgo.com/l/?uddg=<encoded>&rut=..."
  * Some links may already be direct URLs.
  */
-function resolveResultUrl(href: string): string {
+export function resolveResultUrl(href: string): string {
 	if (!href) return "";
 	const normalized = href.startsWith("//") ? `https:${href}` : href;
 	try {
 		const wrapper = new URL(normalized);
 		const target = wrapper.searchParams.get("uddg") ?? normalized;
-		const resolved = new URL(target);
-		if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return "";
-		return resolved.href;
+		return normalizeHttpUrl(target);
 	} catch {
 		return "";
 	}
