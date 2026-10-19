@@ -22,7 +22,7 @@ rap-plus extends Pi with planning, delegation, code intelligence, evidence-first
 
 ## Highlights
 
-- **13 extensions + 1 theme**, all registered automatically on install
+- **12 extensions + 1 theme**, all registered automatically on install
 - **Vivid cobalt-blue theme** (`rap-bluemon`) with automatic Pi-logo recolor — runs at install via `postinstall` and self-heals at runtime after `pi update`
 - **Safety-first design** — read-only planning mode, reproduction-gated fixes, guarded edits, depth-limited subagents, read-only review
 - **161 passing tests** across shared utilities and all 10 extensions
@@ -58,7 +58,6 @@ pi install git:github.com/rapelzzz/rap-plus@main     # pin a ref
 | rap-debug-mode | `extensions/rap-debug-mode` | Evidence-first debug workflow; repro-gated fixes |
 | rap-agent-ide | `extensions/rap-agent-ide` | Guarded editing, search, diff, terminals, CDP debugging, observability |
 | rap-big-logo | `extensions/rap-big-logo` | Enlarged "RAP" startup header via `ctx.ui.setHeader()`; `/rap-logo [on|off]` |
-| rap-toolgate | `extensions/rap-toolgate` | Per-extension on/off toggle to save provider quota; `/rap-settings` (interactive panel), `/rap-settings <id> on\|off`, `/rap-settings all on\|off` |
 | theme | `themes/rap-bluemon.json` | Vivid cobalt-blue dark theme |
 
 ## Theme & logo
@@ -99,9 +98,6 @@ Guarded IDE assistance:
 
 ### rap-big-logo — `/rap-logo [on|off]`
 Replaces Pi's built-in startup header (the small `▀▀█` logo + keybinding hints) with an enlarged **"RAP"** block logo in the active theme's accent color, plus a `rap-plus` version label and a compact keybinding hint line. The built-in logo is a hardcoded 2-row half-block glyph whose size is structural (the header assumes exactly two lines), so it cannot be enlarged in place — `ctx.ui.setHeader()` swaps the whole header for a custom component that can draw an arbitrarily large logo at runtime. Theme-aware (`theme.fg("accent", ...)`) — under `rap-bluemon` it renders in the signature blue, and it recolors automatically when the theme changes. Pure runtime, so it survives `pi update` (unlike the bundle patch in `scripts/patch-pi-logo.sh`, which only recolors the now-hidden built-in logo). Auto-applies on every `session_start` in TUI mode; `/rap-logo` re-applies, `/rap-logo off` restores Pi's built-in header.
-
-### rap-toolgate — `/rap-settings`
-Per-extension on/off toggle for provider-quota savings. Each tool-bearing extension's tool declarations (name + description + JSON schema) enter the system prompt on every request (~140 tokens/tool); disabling an extension prunes its tools from the active set via `pi.setActiveTools()` so they leave the prompt, while the extension itself stays loaded (commands/event handlers still work). Toggle state persists globally in `~/.pi/agent/rap-settings.json` and applies to every session including new ones. The prune is idempotent and re-applied on every `before_agent_start`, so it self-heals after plan-mode or other tool-set changes. Only extensions that register tools appear in the toggle list (non-tool extensions have ~0 fixed per-request cost and are intentionally omitted). `/rap-settings` (no args) opens an interactive `/settings`-style select panel — pick an extension to flip its state, the list refreshes, repeat; **Esc saves & exits** (no "Done" button — each flip persists immediately). Quick forms: `/rap-settings <id> on|off`, `/rap-settings all on|off`.
 
 ## Safety invariants
 
